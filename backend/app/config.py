@@ -2,6 +2,19 @@ import os
 from datetime import timedelta
 
 
+def _build_redis_url() -> str:
+    """从环境变量中的各字段组装 Redis URL，优先使用 REDIS_URL（若已设置）。"""
+    explicit = os.environ.get('REDIS_URL')
+    if explicit:
+        return explicit
+    host = os.environ.get('REDIS_HOST', '127.0.0.1')
+    port = os.environ.get('REDIS_PORT', '6379')
+    password = os.environ.get('REDIS_PASSWORD', '')
+    db = os.environ.get('REDIS_DB', '0')
+    auth = f':{password}@' if password else ''
+    return f'redis://{auth}{host}:{port}/{db}'
+
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///trainer.db')
@@ -10,8 +23,8 @@ class Config:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-dev-key')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 
-    CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-    CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    CELERY_BROKER_URL = _build_redis_url()
+    CELERY_RESULT_BACKEND = _build_redis_url()
 
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', './uploads')
     MODEL_FOLDER = os.environ.get('MODEL_FOLDER', './models')
