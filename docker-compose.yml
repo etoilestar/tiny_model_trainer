@@ -28,7 +28,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-change-me-in-production}
       - DATABASE_URL=sqlite:////app/data/trainer.db
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
       - UPLOAD_FOLDER=/app/uploads
       - MODEL_FOLDER=/app/models
       - CHECKPOINT_FOLDER=/app/checkpoints
@@ -37,9 +37,6 @@ services:
       - backend-uploads:/app/uploads
       - backend-models:/app/models
       - backend-checkpoints:/app/checkpoints
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - trainer-net
 
@@ -55,7 +52,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-change-me-in-production}
       - DATABASE_URL=sqlite:////app/data/trainer.db
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
       - UPLOAD_FOLDER=/app/uploads
       - MODEL_FOLDER=/app/models
       - CHECKPOINT_FOLDER=/app/checkpoints
@@ -65,8 +62,6 @@ services:
       - backend-models:/app/models
       - backend-checkpoints:/app/checkpoints
     depends_on:
-      redis:
-        condition: service_healthy
       backend:
         condition: service_started
     networks:
@@ -80,19 +75,9 @@ services:
               capabilities: [gpu]
 
   # ──────────────────────────────────────────────
-  # Redis 消息队列
+  # Redis 消息队列（使用本机已有的 Redis，无需容器）
+  # 请在 .env 文件中配置 REDIS_URL
   # ──────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - trainer-net
 
 volumes:
   backend-data:
