@@ -22,6 +22,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    platform: linux/${PLATFORM:-amd64}
     ports:
       - "5000:5000"
     environment:
@@ -47,6 +48,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    platform: linux/${PLATFORM:-amd64}
     command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
