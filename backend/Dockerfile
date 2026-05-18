@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 安装 PyTorch 2.5.1（CUDA 12.1）及其余依赖
 COPY requirements.txt .
-RUN pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 \
+RUN pip install --no-cache-dir torch==2.5.1 torchvision==0.20.1 \
         --index-url https://download.pytorch.org/whl/cu121 \
     && pip install --no-cache-dir -r requirements.txt
 
