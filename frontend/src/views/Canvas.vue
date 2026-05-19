@@ -103,9 +103,6 @@
         <!-- Center: Vue Flow canvas -->
         <div
           class="flow-wrapper"
-          @dragover.prevent
-          @drop="onDrop"
-          ref="flowWrapper"
         >
           <VueFlow
             v-model:nodes="nodes"
@@ -118,6 +115,8 @@
             @node-click="onNodeClick"
             @pane-click="selectedNode = null"
             @connect="addEdges"
+            @dragover.prevent
+            @drop="onDrop"
           >
             <Background pattern-color="#e0e0e0" :gap="20" />
             <Controls />
@@ -295,7 +294,7 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.id)
 
-const { project, addNodes, removeNodes, addEdges } = useVueFlow()
+const { screenToFlowCoordinate, addNodes, removeNodes, addEdges } = useVueFlow()
 
 const nodeTypes = markRaw({
   dataset: DatasetNode,
@@ -314,7 +313,6 @@ const saving = ref(false)
 const starting = ref(false)
 const datasets = ref([])
 const currentWorkflowId = ref(null)
-const flowWrapper = ref(null)
 
 let nodeIdCounter = 1
 
@@ -355,12 +353,11 @@ const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 't
 
 function onDrop(event) {
   const type = event.dataTransfer.getData('application/vueflow')
-  if (!type || !validNodeTypes.has(type) || !flowWrapper.value) return
+  if (!type || !validNodeTypes.has(type)) return
 
-  const wrapperRect = flowWrapper.value.getBoundingClientRect()
-  const position = project({
-    x: event.clientX - wrapperRect.left,
-    y: event.clientY - wrapperRect.top
+  const position = screenToFlowCoordinate({
+    x: event.clientX,
+    y: event.clientY
   })
 
   const newNode = {
@@ -369,7 +366,7 @@ function onDrop(event) {
     position,
     data: getDefaultNodeData(type)
   }
-  nodes.value = [...nodes.value, newNode]
+  addNodes([newNode])
 }
 
 function onNodeClick({ node }) {
