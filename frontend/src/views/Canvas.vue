@@ -286,6 +286,7 @@ import DatasetNode from '@/components/nodes/DatasetNode.vue'
 import ModelNode from '@/components/nodes/ModelNode.vue'
 import TrainConfigNode from '@/components/nodes/TrainConfigNode.vue'
 import TrainExecNode from '@/components/nodes/TrainExecNode.vue'
+import ProcessNode from '@/components/nodes/ProcessNode.vue'
 import EvalNode from '@/components/nodes/EvalNode.vue'
 import { getDatasets, getWorkflows, createWorkflow, updateWorkflow, createJob } from '@/api'
 
@@ -300,7 +301,7 @@ const nodeTypes = markRaw({
   model: ModelNode,
   trainConfig: TrainConfigNode,
   eval: EvalNode,
-  process: DatasetNode,
+  process: ProcessNode,
   trainExec: TrainExecNode
 })
 
