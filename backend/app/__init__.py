@@ -17,6 +17,10 @@ def create_app(config_name: str | None = None) -> Flask:
         folder = app.config[folder_key]
         os.makedirs(folder, exist_ok=True)
 
+    # Accept routes with or without trailing slash to avoid 308 redirects that
+    # strip the Authorization header when the browser follows cross-origin.
+    app.url_map.strict_slashes = False
+
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
