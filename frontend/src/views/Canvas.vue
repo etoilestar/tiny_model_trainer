@@ -117,6 +117,7 @@
             fit-view-on-init
             @node-click="onNodeClick"
             @pane-click="selectedNode = null"
+            @connect="addEdges"
           >
             <Background pattern-color="#e0e0e0" :gap="20" />
             <Controls />
@@ -350,25 +351,17 @@ function onDragStart(event, type) {
   event.dataTransfer.setData('application/vueflow', type)
 }
 
+const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
+
 function onDrop(event) {
   const type = event.dataTransfer.getData('application/vueflow')
-  if (!type || !flowWrapper.value) return
+  if (!type || !validNodeTypes.has(type) || !flowWrapper.value) return
 
   const wrapperRect = flowWrapper.value.getBoundingClientRect()
-  const flowEl = flowWrapper.value.querySelector('.vue-flow__pane')
-  if (!flowEl) return
-
-  // Use the project function from useVueFlow to convert screen to flow coordinates
-  const { x: clientX, y: clientY } = {
+  const position = project({
     x: event.clientX - wrapperRect.left,
     y: event.clientY - wrapperRect.top
-  }
-
-  const transform = getFlowTransform()
-  const position = {
-    x: (clientX - transform.x) / transform.zoom,
-    y: (clientY - transform.y) / transform.zoom
-  }
+  })
 
   const newNode = {
     id: generateNodeId(),
@@ -377,17 +370,6 @@ function onDrop(event) {
     data: getDefaultNodeData(type)
   }
   nodes.value = [...nodes.value, newNode]
-}
-
-function getFlowTransform() {
-  const el = flowWrapper.value?.querySelector('.vue-flow__transformationpane')
-  if (!el) return { x: 0, y: 0, zoom: 1 }
-  const style = el.style.transform
-  const match = style.match(/translate\(([^,]+)px,\s*([^)]+)px\)\s*scale\(([^)]+)\)/)
-  if (match) {
-    return { x: parseFloat(match[1]), y: parseFloat(match[2]), zoom: parseFloat(match[3]) }
-  }
-  return { x: 0, y: 0, zoom: 1 }
 }
 
 function onNodeClick({ node }) {
@@ -604,6 +586,10 @@ onMounted(async () => {
   color: #fff;
   transition: all 0.15s;
   user-select: none;
+}
+
+.palette-item * {
+  pointer-events: none;
 }
 
 .palette-item:hover {
