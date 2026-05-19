@@ -318,6 +318,7 @@ const datasets = ref([])
 const currentWorkflowId = ref(null)
 
 let nodeIdCounter = 1
+let _dragNodeType = null
 
 function generateNodeId() {
   return `node_${Date.now()}_${nodeIdCounter++}`
@@ -348,6 +349,7 @@ function miniMapNodeColor(node) {
 }
 
 function onDragStart(event, type) {
+  _dragNodeType = type
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('application/vueflow', type)
 }
@@ -355,7 +357,8 @@ function onDragStart(event, type) {
 const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
 
 function onDrop(event) {
-  const type = event.dataTransfer.getData('application/vueflow')
+  const type = _dragNodeType || event.dataTransfer.getData('application/vueflow')
+  _dragNodeType = null
   if (!type || !validNodeTypes.has(type)) return
 
   const position = screenToFlowCoordinate({
