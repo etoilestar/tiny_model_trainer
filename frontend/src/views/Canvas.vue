@@ -37,6 +37,7 @@
               class="palette-item dataset-item"
               draggable="true"
               @dragstart="onDragStart($event, 'dataset')"
+              @dragend="onDragEnd"
             >
               <el-icon><files /></el-icon>
               <span>数据集节点</span>
@@ -49,6 +50,7 @@
               class="palette-item process-item"
               draggable="true"
               @dragstart="onDragStart($event, 'process')"
+              @dragend="onDragEnd"
             >
               <el-icon><operation /></el-icon>
               <span>数据处理节点</span>
@@ -61,6 +63,7 @@
               class="palette-item model-item"
               draggable="true"
               @dragstart="onDragStart($event, 'model')"
+              @dragend="onDragEnd"
             >
               <el-icon><setting /></el-icon>
               <span>模型选择节点</span>
@@ -73,6 +76,7 @@
               class="palette-item trainconfig-item"
               draggable="true"
               @dragstart="onDragStart($event, 'trainConfig')"
+              @dragend="onDragEnd"
             >
               <el-icon><data-line /></el-icon>
               <span>训练配置节点</span>
@@ -81,6 +85,7 @@
               class="palette-item train-item"
               draggable="true"
               @dragstart="onDragStart($event, 'trainExec')"
+              @dragend="onDragEnd"
             >
               <el-icon><video-play /></el-icon>
               <span>训练执行节点</span>
@@ -93,6 +98,7 @@
               class="palette-item eval-item"
               draggable="true"
               @dragstart="onDragStart($event, 'eval')"
+              @dragend="onDragEnd"
             >
               <el-icon><data-analysis /></el-icon>
               <span>评估节点</span>
@@ -273,7 +279,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, markRaw } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, FolderOpened, VideoPlay } from '@element-plus/icons-vue'
@@ -283,12 +289,7 @@ import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
 
 import Layout from '@/components/Layout.vue'
-import DatasetNode from '@/components/nodes/DatasetNode.vue'
-import ModelNode from '@/components/nodes/ModelNode.vue'
-import TrainConfigNode from '@/components/nodes/TrainConfigNode.vue'
-import TrainExecNode from '@/components/nodes/TrainExecNode.vue'
-import ProcessNode from '@/components/nodes/ProcessNode.vue'
-import EvalNode from '@/components/nodes/EvalNode.vue'
+import { nodeTypes } from '@/components/nodes/nodeTypes.js'
 import { getDatasets, getWorkflows, createWorkflow, updateWorkflow, createJob } from '@/api'
 
 const route = useRoute()
@@ -298,15 +299,6 @@ const projectId = computed(() => route.params.id)
 const FLOW_ID = 'canvas-flow'
 
 const { screenToFlowCoordinate, addNodes, removeNodes, addEdges } = useVueFlow(FLOW_ID)
-
-const nodeTypes = {
-  dataset: markRaw(DatasetNode),
-  model: markRaw(ModelNode),
-  trainConfig: markRaw(TrainConfigNode),
-  eval: markRaw(EvalNode),
-  process: markRaw(ProcessNode),
-  trainExec: markRaw(TrainExecNode)
-}
 
 const nodes = ref([])
 const edges = ref([])
@@ -352,6 +344,10 @@ function onDragStart(event, type) {
   _dragNodeType = type
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('application/vueflow', type)
+}
+
+function onDragEnd() {
+  _dragNodeType = null
 }
 
 const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
