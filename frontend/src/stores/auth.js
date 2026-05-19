@@ -13,7 +13,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(credentials) {
       const res = await loginApi(credentials)
-      const token = res?.data?.token || res?.token
+      const token = res?.data?.access_token || res?.access_token
       if (!token) throw new Error('登录失败：未获取到令牌')
       this.token = token
       localStorage.setItem('token', token)
