@@ -9,7 +9,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "10080:80"
     depends_on:
       - backend
     networks:
