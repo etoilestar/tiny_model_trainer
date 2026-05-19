@@ -105,6 +105,7 @@
           class="flow-wrapper"
         >
           <VueFlow
+            :id="FLOW_ID"
             v-model:nodes="nodes"
             v-model:edges="edges"
             :node-types="nodeTypes"
@@ -294,16 +295,18 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.id)
 
-const { screenToFlowCoordinate, addNodes, removeNodes, addEdges } = useVueFlow()
+const FLOW_ID = 'canvas-flow'
 
-const nodeTypes = markRaw({
-  dataset: DatasetNode,
-  model: ModelNode,
-  trainConfig: TrainConfigNode,
-  eval: EvalNode,
-  process: ProcessNode,
-  trainExec: TrainExecNode
-})
+const { screenToFlowCoordinate, addNodes, removeNodes, addEdges } = useVueFlow(FLOW_ID)
+
+const nodeTypes = {
+  dataset: markRaw(DatasetNode),
+  model: markRaw(ModelNode),
+  trainConfig: markRaw(TrainConfigNode),
+  eval: markRaw(EvalNode),
+  process: markRaw(ProcessNode),
+  trainExec: markRaw(TrainExecNode)
+}
 
 const nodes = ref([])
 const edges = ref([])
