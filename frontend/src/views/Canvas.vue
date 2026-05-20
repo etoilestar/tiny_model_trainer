@@ -367,8 +367,6 @@ function onDragStart(event, nodeType) {
   transfer.clearData()
   transfer.effectAllowed = 'move'
   transfer.setData(NODE_TYPE_TRANSFER_KEY, nodeType)
-  transfer.setData('application/vueflow', nodeType)
-  transfer.setData('application/x-node-type', nodeType)
 }
 
 function onDragEnd() {
@@ -379,10 +377,7 @@ const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 't
 
 function onDrop(event) {
   const transfer = event.dataTransfer
-  const type = (transfer && (transfer.getData(NODE_TYPE_TRANSFER_KEY)
-    || transfer.getData('application/x-node-type')
-    || transfer.getData('application/vueflow')))
-    || _dragNodeType
+  const type = (transfer && transfer.getData(NODE_TYPE_TRANSFER_KEY)) || _dragNodeType
   _dragNodeType = null
   if (!type || !validNodeTypes.has(type)) return
 
