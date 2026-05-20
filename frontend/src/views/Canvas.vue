@@ -36,6 +36,7 @@
             <div
               class="palette-item dataset-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('dataset')"
               @dragstart="onDragStart($event, 'dataset')"
               @dragend="onDragEnd"
             >
@@ -49,6 +50,7 @@
             <div
               class="palette-item process-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('process')"
               @dragstart="onDragStart($event, 'process')"
               @dragend="onDragEnd"
             >
@@ -62,6 +64,7 @@
             <div
               class="palette-item model-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('model')"
               @dragstart="onDragStart($event, 'model')"
               @dragend="onDragEnd"
             >
@@ -75,6 +78,7 @@
             <div
               class="palette-item trainconfig-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('trainConfig')"
               @dragstart="onDragStart($event, 'trainConfig')"
               @dragend="onDragEnd"
             >
@@ -84,6 +88,7 @@
             <div
               class="palette-item train-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('trainExec')"
               @dragstart="onDragStart($event, 'trainExec')"
               @dragend="onDragEnd"
             >
@@ -97,6 +102,7 @@
             <div
               class="palette-item eval-item"
               draggable="true"
+              @pointerdown="setPendingNodeType('eval')"
               @dragstart="onDragStart($event, 'eval')"
               @dragend="onDragEnd"
             >
@@ -316,6 +322,10 @@ function generateNodeId() {
   return `node_${Date.now()}_${nodeIdCounter++}`
 }
 
+function setPendingNodeType(type) {
+  _dragNodeType = type
+}
+
 function getDefaultNodeData(type) {
   const defaults = {
     dataset: { label: '数据集', datasetId: null, format: '' },
@@ -341,9 +351,13 @@ function miniMapNodeColor(node) {
 }
 
 function onDragStart(event, type) {
-  _dragNodeType = type
+  const nodeType = type || _dragNodeType
+  if (!nodeType) return
+
+  _dragNodeType = nodeType
   event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('application/vueflow', type)
+  event.dataTransfer.setData('application/vueflow', nodeType)
+  event.dataTransfer.setData('text/plain', nodeType)
 }
 
 function onDragEnd() {
@@ -353,7 +367,9 @@ function onDragEnd() {
 const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
 
 function onDrop(event) {
-  const type = _dragNodeType || event.dataTransfer.getData('application/vueflow')
+  const type = event.dataTransfer.getData('application/vueflow')
+    || event.dataTransfer.getData('text/plain')
+    || _dragNodeType
   _dragNodeType = null
   if (!type || !validNodeTypes.has(type)) return
 
