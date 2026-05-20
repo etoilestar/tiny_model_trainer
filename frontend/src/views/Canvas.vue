@@ -38,7 +38,7 @@
               data-node-type="dataset"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><files /></el-icon>
@@ -53,7 +53,7 @@
               data-node-type="process"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><operation /></el-icon>
@@ -68,7 +68,7 @@
               data-node-type="model"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><setting /></el-icon>
@@ -83,7 +83,7 @@
               data-node-type="trainConfig"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><data-line /></el-icon>
@@ -94,7 +94,7 @@
               data-node-type="trainExec"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><video-play /></el-icon>
@@ -109,7 +109,7 @@
               data-node-type="eval"
               draggable="true"
               @pointerdown="setPendingNodeTypeFromEvent"
-              @dragstart="onDragStart"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><data-analysis /></el-icon>
@@ -371,11 +371,12 @@ function onDragStart(event) {
   if (!nodeType) return
 
   _dragNodeType = nodeType
-  event.dataTransfer.clearData()
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('application/vueflow', nodeType)
-  event.dataTransfer.setData('application/x-node-type', nodeType)
-  event.dataTransfer.setData('text/plain', nodeType)
+  const transfer = event.dataTransfer
+  if (!transfer) return
+  transfer.clearData()
+  transfer.effectAllowed = 'move'
+  transfer.setData('application/vueflow', nodeType)
+  transfer.setData('application/x-node-type', nodeType)
 }
 
 function onDragEnd() {
@@ -385,9 +386,9 @@ function onDragEnd() {
 const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
 
 function onDrop(event) {
-  const type = event.dataTransfer.getData('application/vueflow')
-    || event.dataTransfer.getData('application/x-node-type')
-    || event.dataTransfer.getData('text/plain')
+  const transfer = event.dataTransfer
+  const type = (transfer && (transfer.getData('application/vueflow')
+    || transfer.getData('application/x-node-type')))
     || _dragNodeType
   _dragNodeType = null
   if (!type || !validNodeTypes.has(type)) return
