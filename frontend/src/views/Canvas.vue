@@ -35,9 +35,10 @@
             <div class="section-label">数据节点</div>
             <div
               class="palette-item dataset-item"
+              data-node-type="dataset"
               draggable="true"
-              @pointerdown="setPendingNodeType('dataset')"
-              @dragstart="onDragStart($event, 'dataset')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><files /></el-icon>
@@ -49,9 +50,10 @@
             <div class="section-label">处理节点</div>
             <div
               class="palette-item process-item"
+              data-node-type="process"
               draggable="true"
-              @pointerdown="setPendingNodeType('process')"
-              @dragstart="onDragStart($event, 'process')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><operation /></el-icon>
@@ -63,9 +65,10 @@
             <div class="section-label">模型节点</div>
             <div
               class="palette-item model-item"
+              data-node-type="model"
               draggable="true"
-              @pointerdown="setPendingNodeType('model')"
-              @dragstart="onDragStart($event, 'model')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><setting /></el-icon>
@@ -77,9 +80,10 @@
             <div class="section-label">训练节点</div>
             <div
               class="palette-item trainconfig-item"
+              data-node-type="trainConfig"
               draggable="true"
-              @pointerdown="setPendingNodeType('trainConfig')"
-              @dragstart="onDragStart($event, 'trainConfig')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><data-line /></el-icon>
@@ -87,9 +91,10 @@
             </div>
             <div
               class="palette-item train-item"
+              data-node-type="trainExec"
               draggable="true"
-              @pointerdown="setPendingNodeType('trainExec')"
-              @dragstart="onDragStart($event, 'trainExec')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><video-play /></el-icon>
@@ -101,9 +106,10 @@
             <div class="section-label">评估节点</div>
             <div
               class="palette-item eval-item"
+              data-node-type="eval"
               draggable="true"
-              @pointerdown="setPendingNodeType('eval')"
-              @dragstart="onDragStart($event, 'eval')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart"
               @dragend="onDragEnd"
             >
               <el-icon><data-analysis /></el-icon>
@@ -323,7 +329,16 @@ function generateNodeId() {
 }
 
 function setPendingNodeType(type) {
-  _dragNodeType = type
+  _dragNodeType = validNodeTypes.has(type) ? type : null
+}
+
+function getNodeTypeFromEvent(event) {
+  const nodeType = event?.currentTarget?.dataset?.nodeType
+  return validNodeTypes.has(nodeType) ? nodeType : null
+}
+
+function setPendingNodeTypeFromEvent(event) {
+  setPendingNodeType(getNodeTypeFromEvent(event))
 }
 
 function getDefaultNodeData(type) {
@@ -335,7 +350,8 @@ function getDefaultNodeData(type) {
     trainExec: { label: '训练执行', jobName: '训练任务', outputDir: './outputs', saveBest: true },
     eval: { label: '评估', metrics: ['mAP', 'Loss'], evalEvery: 1 }
   }
-  return defaults[type] || { label: type }
+  const defaultData = defaults[type] || { label: type }
+  return JSON.parse(JSON.stringify(defaultData))
 }
 
 function miniMapNodeColor(node) {
@@ -350,13 +366,15 @@ function miniMapNodeColor(node) {
   return colors[node.type] || '#409EFF'
 }
 
-function onDragStart(event, type) {
-  const nodeType = type || _dragNodeType
+function onDragStart(event) {
+  const nodeType = getNodeTypeFromEvent(event) || _dragNodeType
   if (!nodeType) return
 
   _dragNodeType = nodeType
+  event.dataTransfer.clearData()
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('application/vueflow', nodeType)
+  event.dataTransfer.setData('application/x-node-type', nodeType)
   event.dataTransfer.setData('text/plain', nodeType)
 }
 
@@ -368,6 +386,7 @@ const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 't
 
 function onDrop(event) {
   const type = event.dataTransfer.getData('application/vueflow')
+    || event.dataTransfer.getData('application/x-node-type')
     || event.dataTransfer.getData('text/plain')
     || _dragNodeType
   _dragNodeType = null
