@@ -333,15 +333,6 @@ function setPendingNodeType(type) {
   _dragNodeType = validNodeTypes.has(type) ? type : null
 }
 
-function getNodeTypeFromEvent(event) {
-  const nodeType = event?.currentTarget?.dataset?.nodeType
-  return validNodeTypes.has(nodeType) ? nodeType : null
-}
-
-function setPendingNodeTypeFromEvent(event) {
-  setPendingNodeType(getNodeTypeFromEvent(event))
-}
-
 function getDefaultNodeData(type) {
   const defaults = {
     dataset: { label: '数据集', datasetId: null, format: '' },
@@ -367,9 +358,8 @@ function miniMapNodeColor(node) {
   return colors[node.type] || '#409EFF'
 }
 
-function onDragStart(event, explicitNodeType) {
-  const nodeType = explicitNodeType || getNodeTypeFromEvent(event) || _dragNodeType
-  if (!nodeType) return
+function onDragStart(event, nodeType) {
+  if (!validNodeTypes.has(nodeType)) return
 
   _dragNodeType = nodeType
   const transfer = event.dataTransfer
