@@ -7,27 +7,42 @@
       <el-icon size="16"><data-line /></el-icon>
       <span class="node-title">训练配置</span>
     </div>
+
     <div class="node-body">
       <div class="node-field">
         <span class="field-label">Epochs：</span>
         <span class="field-value">{{ data.epochs || 50 }}</span>
       </div>
+
       <div class="node-field">
         <span class="field-label">Batch：</span>
         <span class="field-value">{{ data.batchSize || 16 }}</span>
       </div>
+
       <div class="node-field">
         <span class="field-label">LR：</span>
         <span class="field-value">{{ data.learningRate || '0.001' }}</span>
       </div>
+
       <div class="node-field">
         <span class="field-label">优化器：</span>
-        <el-tag size="small" type="warning">{{ (data.optimizer || 'adam').toUpperCase() }}</el-tag>
+        <el-tag size="small" type="warning">{{ optimizerLabel }}</el-tag>
       </div>
+
+      <div class="node-field">
+        <span class="field-label">调度：</span>
+        <el-tag size="small" :type="schedulerTagType">{{ schedulerLabel }}</el-tag>
+      </div>
+
+      <div class="node-field">
+        <span class="field-label">Warmup：</span>
+        <span class="field-value">{{ data.warmupEpochs ?? 3 }} epoch</span>
+      </div>
+
       <div class="node-field">
         <span class="field-label">设备：</span>
-        <el-tag size="small" :type="data.device === 'cuda' ? 'success' : 'info'">
-          {{ data.device === 'cuda' ? 'GPU' : 'CPU' }}
+        <el-tag size="small" :type="data.device === 'cuda' || data.device === '0' ? 'success' : 'info'">
+          {{ data.device === 'cuda' || data.device === '0' ? 'GPU' : 'CPU' }}
         </el-tag>
       </div>
     </div>
@@ -35,20 +50,50 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 
-defineProps({
+const props = defineProps({
   id: String,
   data: { type: Object, default: () => ({}) },
   selected: { type: Boolean, default: false }
+})
+
+const optimizerLabel = computed(() => {
+  const value = props.data.optimizer || 'auto'
+  const map = {
+    auto: 'AUTO',
+    SGD: 'SGD',
+    Adam: 'Adam',
+    AdamW: 'AdamW',
+    adam: 'Adam',
+    adamw: 'AdamW',
+    sgd: 'SGD'
+  }
+  return map[value] || String(value).toUpperCase()
+})
+
+const schedulerLabel = computed(() => {
+  const value = props.data.scheduler || 'none'
+  const map = {
+    none: '无',
+    cosine: '余弦退火',
+    step: 'StepLR',
+    multistep: 'MultiStepLR'
+  }
+  return map[value] || value
+})
+
+const schedulerTagType = computed(() => {
+  return props.data.scheduler === 'cosine' ? 'success' : 'info'
 })
 </script>
 
 <style scoped>
 .flow-node {
   border-radius: 10px;
-  min-width: 160px;
-  max-width: 220px;
+  min-width: 170px;
+  max-width: 240px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 2px solid transparent;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -97,7 +142,7 @@ defineProps({
   color: #909399;
   font-size: 11px;
   white-space: nowrap;
-  min-width: 52px;
+  min-width: 56px;
 }
 
 .field-value {

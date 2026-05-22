@@ -63,16 +63,41 @@
 
           <div class="palette-section">
             <div class="section-label">模型节点</div>
+
             <div
-              class="palette-item model-item"
-              data-node-type="model"
+              class="palette-item model-item yolo-model-item"
+              data-node-type="yoloModel"
               draggable="true"
-              @pointerdown="setPendingNodeType('model')"
-              @dragstart="onDragStart($event, 'model')"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
               @dragend="onDragEnd"
             >
               <el-icon><setting /></el-icon>
-              <span>模型选择节点</span>
+              <span>YOLO模型节点</span>
+            </div>
+
+            <div
+              class="palette-item model-item resnet-model-item"
+              data-node-type="resnetModel"
+              draggable="true"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
+              @dragend="onDragEnd"
+            >
+              <el-icon><setting /></el-icon>
+              <span>ResNet模型节点</span>
+            </div>
+
+            <div
+              class="palette-item model-item bert-model-item"
+              data-node-type="bertModel"
+              draggable="true"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
+              @dragend="onDragEnd"
+            >
+              <el-icon><setting /></el-icon>
+              <span>BERT模型节点</span>
             </div>
           </div>
 
@@ -88,17 +113,6 @@
             >
               <el-icon><data-line /></el-icon>
               <span>训练配置节点</span>
-            </div>
-            <div
-              class="palette-item train-item"
-              data-node-type="trainExec"
-              draggable="true"
-              @pointerdown="setPendingNodeType('trainExec')"
-              @dragstart="onDragStart($event, 'trainExec')"
-              @dragend="onDragEnd"
-            >
-              <el-icon><video-play /></el-icon>
-              <span>训练执行节点</span>
             </div>
           </div>
 
@@ -133,7 +147,7 @@
             fit-view-on-init
             @node-click="onNodeClick"
             @pane-click="selectedNode = null"
-            @connect="addEdges"
+            @connect="onConnect"
             @dragover.prevent
             @drop="onDrop"
           >
@@ -195,19 +209,55 @@
             </template>
 
             <!-- Model Node Props -->
-            <template v-else-if="selectedNode.type === 'model'">
+            <template v-else-if="isModelNode(selectedNode)">
               <el-form label-position="top" size="small">
-                <el-form-item label="框架">
-                  <el-select v-model="selectedNode.data.framework" style="width:100%" @change="updateNodeData">
-                    <el-option label="YOLO" value="yolo" />
-                    <el-option label="BERT" value="bert" />
-                    <el-option label="ResNet" value="resnet" />
-                    <el-option label="自定义" value="custom" />
+                <el-form-item label="模型类型">
+                  <el-input :model-value="selectedNode.data.familyLabel" disabled />
+                </el-form-item>
+
+                <el-form-item label="模型版本">
+                  <el-select
+                    v-model="selectedNode.data.modelVersion"
+                    placeholder="请选择模型版本"
+                    style="width:100%"
+                    @change="onModelVersionChange"
+                  >
+                    <el-option
+                      v-for="item in currentModelVersionOptions"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="模型名称/路径">
-                  <el-input v-model="selectedNode.data.modelName" placeholder="如 yolov8n.pt" @input="updateNodeData" />
+
+                <el-form-item label="模型文件/路径">
+                  <el-input
+                    v-model="selectedNode.data.modelName"
+                    placeholder="如 yolov8n.pt / resnet101"
+                    @input="updateNodeData"
+                  />
                 </el-form-item>
+
+                <el-form-item label="预训练">
+                  <el-switch v-model="selectedNode.data.pretrained" @change="updateNodeData" />
+                </el-form-item>
+
+                <el-alert
+                  v-if="selectedNode.data.framework === 'resnet'"
+                  title="当前前端已支持 ResNet 配置，但后端还需要实现 ResNetTrainer 才能真正训练。"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                />
+
+                <el-alert
+                  v-if="selectedNode.data.framework === 'bert'"
+                  title="BERT 节点用于文本任务，数据集和训练器需要走 BERTTrainer。"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
               </el-form>
             </template>
 
@@ -215,41 +265,123 @@
             <template v-else-if="selectedNode.type === 'trainConfig'">
               <el-form label-position="top" size="small">
                 <el-form-item label="训练轮数 (Epochs)">
-                  <el-input-number v-model="selectedNode.data.epochs" :min="1" :max="1000" style="width:100%" @change="updateNodeData" />
+                  <el-input-number
+                    v-model="selectedNode.data.epochs"
+                    :min="1"
+                    :max="1000"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
                 </el-form-item>
+
                 <el-form-item label="批次大小 (Batch Size)">
-                  <el-input-number v-model="selectedNode.data.batchSize" :min="1" :max="512" style="width:100%" @change="updateNodeData" />
+                  <el-input-number
+                    v-model="selectedNode.data.batchSize"
+                    :min="1"
+                    :max="512"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
                 </el-form-item>
+
+                <el-form-item label="输入尺寸 (Image Size)">
+                  <el-input-number
+                    v-model="selectedNode.data.imgSize"
+                    :min="32"
+                    :max="2048"
+                    :step="32"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
+                </el-form-item>
+
                 <el-form-item label="学习率 (Learning Rate)">
-                  <el-input v-model="selectedNode.data.learningRate" placeholder="0.001" @input="updateNodeData" />
+                  <el-input
+                    v-model="selectedNode.data.learningRate"
+                    placeholder="0.001"
+                    @input="updateNodeData"
+                  />
                 </el-form-item>
+
                 <el-form-item label="优化器">
                   <el-select v-model="selectedNode.data.optimizer" style="width:100%" @change="updateNodeData">
-                    <el-option label="Adam" value="adam" />
-                    <el-option label="SGD" value="sgd" />
-                    <el-option label="AdamW" value="adamw" />
+                    <el-option label="Auto" value="auto" />
+                    <el-option label="SGD" value="SGD" />
+                    <el-option label="Adam" value="Adam" />
+                    <el-option label="AdamW" value="AdamW" />
                   </el-select>
                 </el-form-item>
+
+                <el-form-item label="学习率调度">
+                  <el-select v-model="selectedNode.data.scheduler" style="width:100%" @change="updateNodeData">
+                    <el-option label="不使用调度" value="none" />
+                    <el-option label="余弦退火 Cosine Annealing" value="cosine" />
+                    <el-option label="StepLR" value="step" />
+                    <el-option label="MultiStepLR" value="multistep" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="Warmup Epochs">
+                  <el-input-number
+                    v-model="selectedNode.data.warmupEpochs"
+                    :min="0"
+                    :max="20"
+                    :step="0.5"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="Warmup Momentum">
+                  <el-input
+                    v-model="selectedNode.data.warmupMomentum"
+                    placeholder="0.8"
+                    @input="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="Momentum">
+                  <el-input
+                    v-model="selectedNode.data.momentum"
+                    placeholder="0.937"
+                    @input="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="Weight Decay">
+                  <el-input
+                    v-model="selectedNode.data.weightDecay"
+                    placeholder="0.0005"
+                    @input="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="Early Stop Patience">
+                  <el-input-number
+                    v-model="selectedNode.data.patience"
+                    :min="0"
+                    :max="500"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="DataLoader Workers">
+                  <el-input-number
+                    v-model="selectedNode.data.workers"
+                    :min="0"
+                    :max="16"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
+                </el-form-item>
+
                 <el-form-item label="设备">
                   <el-select v-model="selectedNode.data.device" style="width:100%" @change="updateNodeData">
                     <el-option label="CPU" value="cpu" />
-                    <el-option label="GPU (cuda)" value="cuda" />
+                    <el-option label="GPU 0" value="0" />
+                    <el-option label="CUDA 自动" value="cuda" />
                   </el-select>
-                </el-form-item>
-              </el-form>
-            </template>
-
-            <!-- TrainExec Node Props -->
-            <template v-else-if="selectedNode.type === 'trainExec'">
-              <el-form label-position="top" size="small">
-                <el-form-item label="任务名称">
-                  <el-input v-model="selectedNode.data.jobName" placeholder="训练任务名称" @input="updateNodeData" />
-                </el-form-item>
-                <el-form-item label="输出目录">
-                  <el-input v-model="selectedNode.data.outputDir" placeholder="./outputs" @input="updateNodeData" />
-                </el-form-item>
-                <el-form-item label="保存最优模型">
-                  <el-switch v-model="selectedNode.data.saveBest" @change="updateNodeData" />
                 </el-form-item>
               </el-form>
             </template>
@@ -311,7 +443,7 @@ const projectId = computed(() => route.params.id)
 const FLOW_ID = 'canvas-flow'
 const NODE_TYPE_TRANSFER_KEY = 'application/x-tiny-model-node-type'
 
-const { screenToFlowCoordinate, addNodes, removeNodes, addEdges } = useVueFlow(FLOW_ID)
+const { screenToFlowCoordinate, addNodes, addEdges } = useVueFlow(FLOW_ID)
 
 const nodes = ref([])
 const edges = ref([])
@@ -333,15 +465,90 @@ function setPendingNodeType(type) {
   _dragNodeType = validNodeTypes.has(type) ? type : null
 }
 
+function getNodeTypeFromEvent(event) {
+  const nodeType = event?.currentTarget?.dataset?.nodeType
+  return validNodeTypes.has(nodeType) ? nodeType : null
+}
+
+function setPendingNodeTypeFromEvent(event) {
+  setPendingNodeType(getNodeTypeFromEvent(event))
+}
+
 function getDefaultNodeData(type) {
   const defaults = {
-    dataset: { label: '数据集', datasetId: null, format: '' },
-    process: { label: '数据处理', method: 'normalize', valRatio: 20 },
-    model: { label: '模型选择', framework: 'yolo', modelName: 'yolov8n.pt' },
-    trainConfig: { label: '训练配置', epochs: 50, batchSize: 16, learningRate: '0.001', optimizer: 'adam', device: 'cpu' },
-    trainExec: { label: '训练执行', jobName: '训练任务', outputDir: './outputs', saveBest: true },
-    eval: { label: '评估', metrics: ['mAP', 'Loss'], evalEvery: 1 }
+    dataset: {
+      label: '数据集',
+      datasetId: null,
+      format: ''
+    },
+
+    process: {
+      label: '数据处理',
+      method: 'normalize',
+      valRatio: 20
+    },
+
+    // 兼容旧工作流
+    model: {
+      label: 'YOLO模型',
+      familyLabel: 'YOLO',
+      framework: 'yolo',
+      modelVersion: 'yolov8n',
+      modelName: 'yolov8n.pt',
+      pretrained: true
+    },
+
+    yoloModel: {
+      label: 'YOLO模型',
+      familyLabel: 'YOLO',
+      framework: 'yolo',
+      modelVersion: 'yolov8n',
+      modelName: 'yolov8n.pt',
+      pretrained: true
+    },
+
+    resnetModel: {
+      label: 'ResNet模型',
+      familyLabel: 'ResNet',
+      framework: 'resnet',
+      modelVersion: 'resnet101',
+      modelName: 'resnet101',
+      pretrained: true
+    },
+
+    bertModel: {
+      label: 'BERT模型',
+      familyLabel: 'BERT',
+      framework: 'bert',
+      modelVersion: 'bert-base-chinese',
+      modelName: 'bert-base-chinese',
+      pretrained: true
+    },
+
+    trainConfig: {
+      label: '训练配置',
+      epochs: 50,
+      batchSize: 16,
+      imgSize: 640,
+      learningRate: '0.001',
+      optimizer: 'auto',
+      scheduler: 'cosine',
+      warmupEpochs: 3,
+      warmupMomentum: '0.8',
+      momentum: '0.937',
+      weightDecay: '0.0005',
+      patience: 50,
+      workers: 0,
+      device: 'cuda'
+    },
+
+    eval: {
+      label: '评估',
+      metrics: ['mAP', 'Loss'],
+      evalEvery: 1
+    }
   }
+
   const defaultData = defaults[type] || { label: type }
   return JSON.parse(JSON.stringify(defaultData))
 }
@@ -350,30 +557,93 @@ function miniMapNodeColor(node) {
   const colors = {
     dataset: '#1890ff',
     process: '#722ed1',
+
     model: '#722ed1',
+    yoloModel: '#13c2c2',
+    resnetModel: '#722ed1',
+    bertModel: '#2f54eb',
+
     trainConfig: '#fa8c16',
-    trainExec: '#fa541c',
     eval: '#52c41a'
   }
+
   return colors[node.type] || '#409EFF'
 }
 
 function onDragStart(event, nodeType) {
-  if (!validNodeTypes.has(nodeType)) return
+  const resolvedType = nodeType || getNodeTypeFromEvent(event) || _dragNodeType
+  if (!validNodeTypes.has(resolvedType)) return
 
-  _dragNodeType = nodeType
+  _dragNodeType = resolvedType
   const transfer = event.dataTransfer
   if (!transfer) return
+
   transfer.clearData()
   transfer.effectAllowed = 'move'
-  transfer.setData(NODE_TYPE_TRANSFER_KEY, nodeType)
+  transfer.setData(NODE_TYPE_TRANSFER_KEY, resolvedType)
 }
 
 function onDragEnd() {
   _dragNodeType = null
 }
 
-const validNodeTypes = new Set(['dataset', 'process', 'model', 'trainConfig', 'trainExec', 'eval'])
+const MODEL_NODE_TYPES = new Set(['model', 'yoloModel', 'resnetModel', 'bertModel'])
+
+const MODEL_VERSION_OPTIONS = {
+  yolo: [
+    { label: 'YOLOv8n - Nano', value: 'yolov8n', modelName: 'yolov8n.pt' },
+    { label: 'YOLOv8s - Small', value: 'yolov8s', modelName: 'yolov8s.pt' },
+    { label: 'YOLOv8m - Medium', value: 'yolov8m', modelName: 'yolov8m.pt' },
+    { label: 'YOLOv8l - Large', value: 'yolov8l', modelName: 'yolov8l.pt' },
+    { label: 'YOLOv8x - XLarge', value: 'yolov8x', modelName: 'yolov8x.pt' }
+  ],
+  resnet: [
+    { label: 'ResNet-18', value: 'resnet18', modelName: 'resnet18' },
+    { label: 'ResNet-34', value: 'resnet34', modelName: 'resnet34' },
+    { label: 'ResNet-50', value: 'resnet50', modelName: 'resnet50' },
+    { label: 'ResNet-101', value: 'resnet101', modelName: 'resnet101' },
+    { label: 'ResNet-152', value: 'resnet152', modelName: 'resnet152' }
+  ],
+  bert: [
+    { label: 'BERT Base Chinese', value: 'bert-base-chinese', modelName: 'bert-base-chinese' },
+    { label: 'BERT Base Uncased', value: 'bert-base-uncased', modelName: 'bert-base-uncased' }
+  ]
+}
+
+function isModelNode(node) {
+  return !!node && MODEL_NODE_TYPES.has(node.type)
+}
+
+const currentModelVersionOptions = computed(() => {
+  const framework = selectedNode.value?.data?.framework
+  return MODEL_VERSION_OPTIONS[framework] || []
+})
+
+function onModelVersionChange() {
+  if (!selectedNode.value) return
+
+  const framework = selectedNode.value.data.framework
+  const version = selectedNode.value.data.modelVersion
+  const options = MODEL_VERSION_OPTIONS[framework] || []
+  const option = options.find(item => item.value === version)
+
+  if (option) {
+    selectedNode.value.data.modelName = option.modelName
+  }
+
+  updateNodeData()
+}
+
+const validNodeTypes = new Set([
+  'dataset',
+  'process',
+  'model',
+  'yoloModel',
+  'resnetModel',
+  'bertModel',
+  'trainConfig',
+  'eval'
+])
 
 function onDrop(event) {
   const transfer = event.dataTransfer
@@ -393,6 +663,307 @@ function onDrop(event) {
     data: getDefaultNodeData(type)
   }
   addNodes([newNode])
+}
+
+const allowedConnectionMap = {
+  dataset: ['process', 'trainConfig'],
+  process: ['trainConfig'],
+
+  model: ['trainConfig'],
+  yoloModel: ['trainConfig'],
+  resnetModel: ['trainConfig'],
+  bertModel: ['trainConfig'],
+
+  trainConfig: ['eval'],
+  eval: []
+}
+
+const connectionTipMap = {
+  dataset: '数据集节点只能连接到数据处理节点或训练配置节点',
+  process: '数据处理节点只能连接到训练配置节点',
+
+  model: '模型节点只能连接到训练配置节点',
+  yoloModel: 'YOLO模型节点只能连接到训练配置节点',
+  resnetModel: 'ResNet模型节点只能连接到训练配置节点',
+  bertModel: 'BERT模型节点只能连接到训练配置节点',
+
+  trainConfig: '训练配置节点只能连接到评估节点',
+  eval: '评估节点是流程末端节点，不能继续向外连接'
+}
+
+function getNodeById(nodeId) {
+  return nodes.value.find(n => n.id === nodeId)
+}
+
+function isAllowedConnection(sourceType, targetType) {
+  return allowedConnectionMap[sourceType]?.includes(targetType) || false
+}
+
+function hasPath(sourceId, targetId) {
+  if (!sourceId || !targetId) return false
+  if (sourceId === targetId) return true
+
+  const visited = new Set()
+  const queue = [sourceId]
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (current === targetId) return true
+    if (visited.has(current)) continue
+    visited.add(current)
+
+    edges.value
+      .filter(e => e.source === current)
+      .forEach(e => {
+        if (!visited.has(e.target)) queue.push(e.target)
+      })
+  }
+
+  return false
+}
+
+function onConnect(connection) {
+  const sourceNode = getNodeById(connection.source)
+  const targetNode = getNodeById(connection.target)
+
+  if (!sourceNode || !targetNode) {
+    ElMessage.warning('连线失败：节点不存在')
+    return
+  }
+
+  if (sourceNode.id === targetNode.id) {
+    ElMessage.warning('不能连接节点自身')
+    return
+  }
+
+  if (!isAllowedConnection(sourceNode.type, targetNode.type)) {
+    ElMessage.warning(connectionTipMap[sourceNode.type] || '当前节点之间不允许连接')
+    return
+  }
+
+  if (hasPath(targetNode.id, sourceNode.id)) {
+    ElMessage.warning('不能形成循环依赖')
+    return
+  }
+
+  const duplicated = edges.value.some(
+    e => e.source === connection.source && e.target === connection.target
+  )
+  if (duplicated) {
+    ElMessage.warning('这两个节点已经连接过了')
+    return
+  }
+
+  addEdges([{
+    ...connection,
+    id: `edge_${connection.source}_${connection.target}_${Date.now()}`
+  }])
+}
+
+function sanitizeNodes(rawNodes = []) {
+  return rawNodes.filter(n => validNodeTypes.has(n.type))
+}
+
+function sanitizeEdges(rawEdges = [], validNodes = nodes.value) {
+  const nodeMap = new Map(validNodes.map(n => [n.id, n]))
+  return rawEdges.filter(edge => {
+    const sourceNode = nodeMap.get(edge.source)
+    const targetNode = nodeMap.get(edge.target)
+    return sourceNode && targetNode && isAllowedConnection(sourceNode.type, targetNode.type)
+  })
+}
+
+function getSingleNodeByType(type, name) {
+  const matched = nodes.value.filter(n => n.type === type)
+  if (matched.length === 0) {
+    ElMessage.warning(`请添加${name}`)
+    return null
+  }
+  if (matched.length > 1) {
+    ElMessage.warning(`${name}暂时只支持保留一个`)
+    return null
+  }
+  return matched[0]
+}
+
+function getOptionalSingleNodeByType(type, name) {
+  const matched = nodes.value.filter(n => n.type === type)
+  if (matched.length > 1) {
+    ElMessage.warning(`${name}暂时只支持保留一个`)
+    return null
+  }
+  return matched[0] || null
+}
+
+function getSingleModelNode() {
+  const matched = nodes.value.filter(n => isModelNode(n))
+
+  if (matched.length === 0) {
+    ElMessage.warning('请添加模型节点，例如 YOLO模型节点')
+    return null
+  }
+
+  if (matched.length > 1) {
+    ElMessage.warning('当前暂时只支持一个模型节点，请只保留 YOLO、ResNet、BERT 中的一种')
+    return null
+  }
+
+  return matched[0]
+}
+
+function validateWorkflowBeforeStart() {
+  const datasetNode = getSingleNodeByType('dataset', '数据集节点')
+  if (!datasetNode) return null
+
+  const modelNode = getSingleModelNode()
+  if (!modelNode) return null
+
+  const trainConfigNode = getSingleNodeByType('trainConfig', '训练配置节点')
+  if (!trainConfigNode) return null
+
+  const processNode = getOptionalSingleNodeByType('process', '数据处理节点')
+  if (processNode === null && nodes.value.some(n => n.type === 'process')) return null
+
+  const evalNode = getOptionalSingleNodeByType('eval', '评估节点')
+  if (evalNode === null && nodes.value.some(n => n.type === 'eval')) return null
+
+  if (!datasetNode.data?.datasetId) {
+    ElMessage.warning('请在数据集节点中选择数据集')
+    return null
+  }
+
+  if (!modelNode.data?.modelName) {
+    ElMessage.warning('请在模型节点中选择模型版本或填写模型名称/路径')
+    return null
+  }
+
+  if (!hasPath(datasetNode.id, trainConfigNode.id)) {
+    ElMessage.warning('请将数据集节点连接到训练配置节点，可直接连接，也可经过数据处理节点')
+    return null
+  }
+
+  if (!hasPath(modelNode.id, trainConfigNode.id)) {
+    ElMessage.warning('请将模型节点连接到训练配置节点')
+    return null
+  }
+
+  if (processNode && !hasPath(datasetNode.id, processNode.id)) {
+    ElMessage.warning('请将数据集节点连接到数据处理节点')
+    return null
+  }
+
+  if (processNode && !hasPath(processNode.id, trainConfigNode.id)) {
+    ElMessage.warning('请将数据处理节点连接到训练配置节点')
+    return null
+  }
+
+  if (evalNode && !hasPath(trainConfigNode.id, evalNode.id)) {
+    ElMessage.warning('请将训练配置节点连接到评估节点')
+    return null
+  }
+
+  return {
+    datasetNode,
+    processNode,
+    modelNode,
+    trainConfigNode,
+    evalNode
+  }
+}
+
+function normalizeTrainerType(framework) {
+  const value = String(framework || '').trim().toLowerCase()
+
+  const aliasMap = {
+    yolo: 'yolo',
+    yolov5: 'yolo',
+    yolov8: 'yolo',
+    ultralytics: 'yolo',
+    bert: 'bert',
+    resnet: 'resnet'
+  }
+
+  return aliasMap[value] || value
+}
+
+function buildJobDataFromWorkflow(compiledWorkflow) {
+  const { datasetNode, processNode, modelNode, trainConfigNode, evalNode } = compiledWorkflow
+
+  const learningRate = parseFloat(trainConfigNode.data.learningRate)
+  const warmupMomentum = parseFloat(trainConfigNode.data.warmupMomentum)
+  const momentum = parseFloat(trainConfigNode.data.momentum)
+  const weightDecay = parseFloat(trainConfigNode.data.weightDecay)
+
+  const trainerType = normalizeTrainerType(modelNode.data.framework)
+
+  return {
+    name: workflowName.value,
+    project_id: projectId.value,
+    workflow_id: currentWorkflowId.value,
+    config: {
+      trainer_type: trainerType,
+
+      model_node_type: modelNode.type,
+      framework: modelNode.data.framework,
+      model_family: modelNode.data.familyLabel,
+      model_version: modelNode.data.modelVersion,
+      model_name: modelNode.data.modelName,
+      pretrained: !!modelNode.data.pretrained,
+
+      dataset_id: datasetNode.data.datasetId,
+
+      data_process: processNode
+        ? {
+            method: processNode.data.method,
+            val_ratio: processNode.data.valRatio
+          }
+        : null,
+
+      epochs: trainConfigNode.data.epochs,
+      batch_size: trainConfigNode.data.batchSize,
+      img_size: trainConfigNode.data.imgSize || 640,
+
+      lr: Number.isFinite(learningRate) ? learningRate : 0.001,
+      learning_rate: Number.isFinite(learningRate) ? learningRate : 0.001,
+
+      optimizer: trainConfigNode.data.optimizer || 'auto',
+
+      scheduler: trainConfigNode.data.scheduler || 'none',
+      cos_lr: trainConfigNode.data.scheduler === 'cosine',
+
+      warmup_epochs: trainConfigNode.data.warmupEpochs ?? 3,
+      warmup_momentum: Number.isFinite(warmupMomentum) ? warmupMomentum : 0.8,
+
+      momentum: Number.isFinite(momentum) ? momentum : 0.937,
+      weight_decay: Number.isFinite(weightDecay) ? weightDecay : 0.0005,
+
+      patience: trainConfigNode.data.patience ?? 50,
+      workers: trainConfigNode.data.workers ?? 0,
+
+      device: trainConfigNode.data.device || 'cpu',
+
+      evaluation: evalNode
+        ? {
+            metrics: evalNode.data.metrics || [],
+            eval_every: evalNode.data.evalEvery || 1
+          }
+        : null,
+
+      workflow: {
+        nodes: nodes.value.map(n => ({
+          id: n.id,
+          type: n.type,
+          position: n.position,
+          data: n.data
+        })),
+        edges: edges.value.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target
+        }))
+      }
+    }
+  }
 }
 
 function onNodeClick({ node }) {
@@ -429,14 +1000,15 @@ function clearCanvas() {
   }).catch(() => {})
 }
 
-async function saveCanvas() {
+async function saveCanvas(showMessage = true) {
+  const shouldNotify = showMessage !== false
   saving.value = true
   try {
     const payload = {
       name: workflowName.value,
       project_id: projectId.value,
-      nodes: nodes.value.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
-      edges: edges.value.map(e => ({ id: e.id, source: e.source, target: e.target }))
+      nodes: sanitizeNodes(nodes.value).map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+      edges: sanitizeEdges(edges.value, sanitizeNodes(nodes.value)).map(e => ({ id: e.id, source: e.source, target: e.target }))
     }
     if (currentWorkflowId.value) {
       await updateWorkflow(currentWorkflowId.value, payload)
@@ -444,9 +1016,11 @@ async function saveCanvas() {
       const res = await createWorkflow(payload)
       currentWorkflowId.value = res?.data?.id || res?.id
     }
-    ElMessage.success('画布保存成功')
+    if (shouldNotify) ElMessage.success('画布保存成功')
+    return true
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '保存失败')
+    if (shouldNotify) ElMessage.error(e?.response?.data?.message || '保存失败')
+    throw e
   } finally {
     saving.value = false
   }
@@ -457,33 +1031,14 @@ async function startTraining() {
     ElMessage.warning('请先在画布上添加节点')
     return
   }
-  const configNode = nodes.value.find(n => n.type === 'trainConfig')
-  const modelNode = nodes.value.find(n => n.type === 'model')
-  const datasetNode = nodes.value.find(n => n.type === 'dataset')
 
-  if (!configNode || !modelNode || !datasetNode) {
-    ElMessage.warning('请确保画布包含数据集节点、模型节点和训练配置节点')
-    return
-  }
+  const compiledWorkflow = validateWorkflowBeforeStart()
+  if (!compiledWorkflow) return
 
   starting.value = true
   try {
-    await saveCanvas()
-    const jobData = {
-      name: configNode.data.jobName || workflowName.value,
-      project_id: projectId.value,
-      workflow_id: currentWorkflowId.value,
-      config: {
-        framework: modelNode.data.framework,
-        model_name: modelNode.data.modelName,
-        dataset_id: datasetNode.data.datasetId,
-        epochs: configNode.data.epochs,
-        batch_size: configNode.data.batchSize,
-        learning_rate: parseFloat(configNode.data.learningRate) || 0.001,
-        optimizer: configNode.data.optimizer,
-        device: configNode.data.device
-      }
-    }
+    await saveCanvas(false)
+    const jobData = buildJobDataFromWorkflow(compiledWorkflow)
     const res = await createJob(jobData)
     const jobId = res?.data?.id || res?.id
     ElMessage.success('训练任务已启动')
@@ -503,8 +1058,8 @@ async function loadWorkflow() {
       const wf = workflows[0]
       currentWorkflowId.value = wf.id
       workflowName.value = wf.name || '未命名工作流'
-      if (wf.nodes) nodes.value = wf.nodes
-      if (wf.edges) edges.value = wf.edges
+      if (wf.nodes) nodes.value = sanitizeNodes(wf.nodes)
+      if (wf.edges) edges.value = sanitizeEdges(wf.edges, nodes.value)
     }
   } catch {
     // no workflow yet
@@ -628,7 +1183,6 @@ onMounted(async () => {
 .process-item { background: linear-gradient(135deg, #722ed1, #531dab); }
 .model-item { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
 .trainconfig-item { background: linear-gradient(135deg, #fa8c16, #d46b08); }
-.train-item { background: linear-gradient(135deg, #fa541c, #d4380d); }
 .eval-item { background: linear-gradient(135deg, #52c41a, #389e0d); }
 
 .flow-wrapper {

@@ -2,7 +2,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from flask import Blueprint, request, jsonify, Response, current_app, abort
+from flask import Blueprint, request, jsonify, Response, current_app, abort, stream_with_context
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
@@ -167,7 +167,7 @@ def get_logs(job_id):
             .all())
     return ok(clean_response([log.to_dict() for log in logs]))
 
-
+@training_bp.route('/jobs/<int:job_id>/stream')
 @training_bp.route('/jobs/<int:job_id>/logs/stream')
 @jwt_required()
 def stream_logs(job_id):
@@ -175,41 +175,76 @@ def stream_logs(job_id):
     user_id = int(get_jwt_identity())
     _require_job(job_id, user_id)
 
+    @stream_with_context
     def generate():
         last_id = 0
-        while True:
-            # Refresh session to pick up changes from Celery worker
-            db.session.expire_all()
 
-            logs = (TrainingLog.query
-                    .filter(TrainingLog.job_id == job_id,
-                            TrainingLog.id > last_id)
+        # 关键：立刻输出一条消息，避免浏览器一直等、页面看起来卡住
+        yield 'retry: 3000\n\n'
+        yield f'data: {json.dumps({"event": "connected", "job_id": job_id}, ensure_ascii=False)}\n\n'
+
+        try:
+            while True:
+                # 每轮使用新 session 状态，避免读不到 Celery worker 写入的新日志
+                db.session.expire_all()
+
+                logs = (
+                    TrainingLog.query
+                    .filter(
+                        TrainingLog.job_id == job_id,
+                        TrainingLog.id > last_id
+                    )
                     .order_by(TrainingLog.id)
-                    .all())
+                    .all()
+                )
 
-            for log in logs:
-                payload = json.dumps({
-                    'id': log.id,
-                    'time': log.timestamp.isoformat(),
-                    'level': log.level,
-                    'message': log.message,
-                }, ensure_ascii=False)
-                yield f'data: {payload}\n\n'
-                last_id = log.id
+                has_output = False
 
-            current_job = db.session.get(TrainingJob, job_id)
-            if current_job and current_job.status in ('completed', 'failed', 'stopped'):
-                yield f'data: {json.dumps({"event": "done", "status": current_job.status})}\n\n'
-                break
+                for log in logs:
+                    payload = json.dumps({
+                        'id': log.id,
+                        'time': log.timestamp.isoformat() if log.timestamp else '',
+                        'level': log.level,
+                        'message': log.message,
+                    }, ensure_ascii=False)
 
-            time.sleep(1)
+                    yield f'data: {payload}\n\n'
+                    last_id = log.id
+                    has_output = True
+
+                current_job = db.session.get(TrainingJob, job_id)
+                status = current_job.status if current_job else 'unknown'
+
+                if status in ('completed', 'failed', 'stopped'):
+                    payload = json.dumps({
+                        'event': 'done',
+                        'status': status
+                    }, ensure_ascii=False)
+
+                    yield f'data: {payload}\n\n'
+                    break
+
+                # 关键：没有新日志时也发心跳，防止前端/反代认为连接没数据
+                if not has_output:
+                    heartbeat = json.dumps({
+                        'event': 'heartbeat',
+                        'job_id': job_id,
+                        'status': status,
+                        'last_id': last_id,
+                    }, ensure_ascii=False)
+                    yield f'data: {heartbeat}\n\n'
+
+                time.sleep(2)
+
+        finally:
+            db.session.remove()
 
     return Response(
         generate(),
         mimetype='text/event-stream',
         headers={
             'X-Accel-Buffering': 'no',
-            'Cache-Control': 'no-cache',
+            'Cache-Control': 'no-cache, no-transform',
             'Connection': 'keep-alive',
         },
     )

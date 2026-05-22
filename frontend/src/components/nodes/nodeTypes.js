@@ -2,21 +2,29 @@ import { markRaw } from 'vue'
 import DatasetNode from './DatasetNode.vue'
 import ModelNode from './ModelNode.vue'
 import TrainConfigNode from './TrainConfigNode.vue'
-import TrainExecNode from './TrainExecNode.vue'
 import ProcessNode from './ProcessNode.vue'
 import EvalNode from './EvalNode.vue'
 
 /**
  * Node type map for VueFlow.
- * Defined at module scope (not inside component setup) so Vue never wraps it
- * in a reactive proxy — required by VueFlow to resolve custom node components
- * correctly.
+ *
+ * 注意：
+ * - 不再把“模型选择”作为一个总节点暴露给用户；
+ * - 画布上使用 yoloModel / resnetModel / bertModel 等明确模型族节点；
+ * - model 保留只是为了兼容历史保存的旧工作流。
  */
 export const nodeTypes = markRaw({
   dataset: DatasetNode,
-  model: ModelNode,
-  trainConfig: TrainConfigNode,
-  eval: EvalNode,
   process: ProcessNode,
-  trainExec: TrainExecNode
+
+  // 兼容旧版通用模型节点
+  model: ModelNode,
+
+  // 新版明确模型族节点
+  yoloModel: ModelNode,
+  resnetModel: ModelNode,
+  bertModel: ModelNode,
+
+  trainConfig: TrainConfigNode,
+  eval: EvalNode
 })

@@ -223,12 +223,53 @@ function startSSE() {
     sseSource.close()
     sseSource = null
   }
+
   const token = localStorage.getItem('token')
-  const url = `/api/training/jobs/${jobId.value}/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  const url = `/api/training/jobs/${jobId.value}/logs/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`
+
   sseSource = new EventSource(url)
 
-  sseSource.onmessage = (event) => {
-    appendLog(event.data)
+  sseSource.onmessage = async (event) => {
+    let data = null
+
+    try {
+      data = JSON.parse(event.data)
+    } catch {
+      appendLog(event.data)
+      return
+    }
+
+    // 后端心跳消息，不显示到日志面板
+    if (data.event === 'connected' || data.event === 'heartbeat') {
+      return
+    }
+
+    // 任务结束，关闭 SSE，并刷新一次任务状态和日志
+    if (data.event === 'done') {
+      if (data.status) {
+        jobInfo.value = { ...jobInfo.value, status: data.status }
+      }
+      sseSource?.close()
+      sseSource = null
+      await refreshLogs()
+      return
+    }
+
+    // 普通训练日志
+    if (data.message) {
+      logEntries.value.push({
+        id: data.id,
+        time: data.time ? dayjs(data.time).format('HH:mm:ss') : dayjs().format('HH:mm:ss'),
+        level: (data.level || 'INFO').toUpperCase(),
+        message: data.message
+      })
+
+      if (logEntries.value.length > 2000) {
+        logEntries.value = logEntries.value.slice(-2000)
+      }
+
+      scrollToBottom()
+    }
   }
 
   sseSource.addEventListener('log', (event) => {
@@ -243,7 +284,7 @@ function startSSE() {
   })
 
   sseSource.onerror = () => {
-    // SSE failed, fall back to polling logs
+    // SSE 失败时，退回普通轮询
     sseSource?.close()
     sseSource = null
     startLogPolling()
@@ -264,13 +305,36 @@ function startLogPolling() {
 async function refreshLogs() {
   try {
     const res = await getJobLogs(jobId.value)
-    const raw = res?.data || res || {}
-    const logText = raw.logs || raw.log || ''
-    if (typeof logText === 'string' && logText.trim()) {
-      logEntries.value = []
-      appendLog(logText)
+    const raw = res?.data || res || []
+
+    logEntries.value = []
+
+    if (Array.isArray(raw)) {
+      for (const item of raw) {
+        logEntries.value.push({
+          id: item.id,
+          time: item.timestamp
+            ? dayjs(item.timestamp).format('HH:mm:ss')
+            : item.time
+              ? dayjs(item.time).format('HH:mm:ss')
+              : dayjs().format('HH:mm:ss'),
+          level: (item.level || 'INFO').toUpperCase(),
+          message: item.message || ''
+        })
+      }
+    } else {
+      const logText = raw.logs || raw.log || ''
+      if (typeof logText === 'string' && logText.trim()) {
+        appendLog(logText)
+      }
     }
-    // Also refresh job info
+
+    if (logEntries.value.length > 2000) {
+      logEntries.value = logEntries.value.slice(-2000)
+    }
+
+    await scrollToBottom()
+
     const jobRes = await getJob(jobId.value)
     jobInfo.value = jobRes?.data || jobRes || {}
   } catch { /* ignore */ }

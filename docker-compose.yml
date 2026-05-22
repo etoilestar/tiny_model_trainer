@@ -9,7 +9,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "10080:80"
     depends_on:
       - backend
     networks:
@@ -24,19 +24,20 @@ services:
       dockerfile: Dockerfile
     platform: linux/${PLATFORM:-amd64}
     ports:
-      - "5000:5000"
+      - "5005:5000"
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-change-me-in-production}
       - DATABASE_URL=sqlite:////app/data/trainer.db
-      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
+      - REDIS_URL=${REDIS_URL:-redis://default:adminADMIN%23%40%21@172.18.29.80:56379/6}
       - UPLOAD_FOLDER=/app/uploads
       - MODEL_FOLDER=/app/models
       - CHECKPOINT_FOLDER=/app/checkpoints
     volumes:
       - backend-data:/app/data
       - backend-uploads:/app/uploads
-      - backend-models:/app/models
+      - ./models:/app/models
+      - ./datasets:/app/datasets
       - backend-checkpoints:/app/checkpoints
     networks:
       - trainer-net
@@ -54,14 +55,15 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-change-me-in-production}
       - DATABASE_URL=sqlite:////app/data/trainer.db
-      - REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
+      - REDIS_URL=${REDIS_URL:-redis://default:adminADMIN%23%40%21@172.18.29.80:56379/6}
       - UPLOAD_FOLDER=/app/uploads
       - MODEL_FOLDER=/app/models
       - CHECKPOINT_FOLDER=/app/checkpoints
     volumes:
       - backend-data:/app/data
       - backend-uploads:/app/uploads
-      - backend-models:/app/models
+      - ./models:/app/models
+      - ./datasets:/app/datasets
       - backend-checkpoints:/app/checkpoints
     depends_on:
       backend:

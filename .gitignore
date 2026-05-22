@@ -1,1 +1,3 @@
 backend/.env
+docker-compose.yml
+models/*

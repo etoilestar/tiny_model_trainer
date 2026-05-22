@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from .config import config_map
 from .extensions import db, jwt, migrate, cors, celery
 

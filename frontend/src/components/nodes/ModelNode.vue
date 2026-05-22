@@ -1,17 +1,26 @@
 <template>
-  <div class="flow-node model-node" :class="{ selected }">
-    <Handle type="target" :position="Position.Left" />
+  <div
+    class="flow-node model-node"
+    :class="[`model-node-${data.framework || 'generic'}`, { selected }]"
+  >
     <Handle type="source" :position="Position.Right" />
 
     <div class="node-header">
       <el-icon size="16"><setting /></el-icon>
-      <span class="node-title">模型选择</span>
+      <span class="node-title">{{ title }}</span>
     </div>
+
     <div class="node-body">
       <div class="node-field">
-        <span class="field-label">框架：</span>
-        <el-tag size="small" type="warning">{{ data.framework || 'YOLO' }}</el-tag>
+        <span class="field-label">类型：</span>
+        <el-tag size="small" type="warning">{{ familyLabel }}</el-tag>
       </div>
+
+      <div class="node-field">
+        <span class="field-label">版本：</span>
+        <span class="field-value">{{ data.modelVersion || '-' }}</span>
+      </div>
+
       <div class="node-field">
         <span class="field-label">模型：</span>
         <span class="field-value">{{ data.modelName || '未设置' }}</span>
@@ -21,20 +30,41 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 
-defineProps({
+const props = defineProps({
   id: String,
   data: { type: Object, default: () => ({}) },
   selected: { type: Boolean, default: false }
+})
+
+const familyLabel = computed(() => {
+  const map = {
+    yolo: 'YOLO',
+    resnet: 'ResNet',
+    bert: 'BERT',
+    custom: '自定义'
+  }
+  return map[props.data.framework] || props.data.framework || '模型'
+})
+
+const title = computed(() => {
+  const map = {
+    yolo: 'YOLO 模型',
+    resnet: 'ResNet 模型',
+    bert: 'BERT 模型',
+    custom: '自定义模型'
+  }
+  return map[props.data.framework] || '模型节点'
 })
 </script>
 
 <style scoped>
 .flow-node {
   border-radius: 10px;
-  min-width: 160px;
-  max-width: 220px;
+  min-width: 170px;
+  max-width: 240px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 2px solid transparent;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -55,6 +85,18 @@ defineProps({
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.model-node-yolo .node-header {
+  background: linear-gradient(135deg, #13c2c2, #08979c);
+}
+
+.model-node-resnet .node-header {
+  background: linear-gradient(135deg, #722ed1, #531dab);
+}
+
+.model-node-bert .node-header {
+  background: linear-gradient(135deg, #2f54eb, #1d39c4);
 }
 
 .node-title {
@@ -83,6 +125,7 @@ defineProps({
   color: #909399;
   font-size: 11px;
   white-space: nowrap;
+  min-width: 40px;
 }
 
 .field-value {
@@ -92,6 +135,6 @@ defineProps({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 130px;
+  max-width: 150px;
 }
 </style>
