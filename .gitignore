@@ -1,3 +1,4 @@
 backend/.env
 docker-compose.yml
 models/*
+datasets

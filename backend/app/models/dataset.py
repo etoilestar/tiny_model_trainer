@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 from ..extensions import db
 
-DATASET_FORMATS = ('yolo', 'coco', 'imagefolder', 'csv', 'jsonl')
+# yolo/coco 保持原有语义：上传 zip 后仍按 zip 文件路径保存，不自动改动训练逻辑。
+# imagefolder 用于 ResNet/mmpretrain 分类任务。
+# mmseg 用于 UNet/mmseg 语义分割任务。
+DATASET_FORMATS = ('yolo', 'coco', 'imagefolder', 'mmseg', 'csv', 'jsonl')
 DATASET_STATUSES = ('uploading', 'ready', 'error')
 
 
@@ -12,7 +15,7 @@ class Dataset(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, default='')
-    format = db.Column(db.String(32), nullable=False)  # yolo/coco/imagefolder/csv/jsonl
+    format = db.Column(db.String(32), nullable=False)  # yolo/coco/imagefolder/mmseg/csv/jsonl
     file_path = db.Column(db.String(512), nullable=False)
     size = db.Column(db.BigInteger, default=0)  # bytes
     status = db.Column(db.String(32), default='ready')

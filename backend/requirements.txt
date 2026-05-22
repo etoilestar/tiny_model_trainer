@@ -12,10 +12,11 @@ torchvision==0.20.1
 transformers>=4.40.0
 ultralytics>=8.2.0
 scikit-learn>=1.4.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 pillow>=10.0.0
 tqdm>=4.66.0
 async-timeout==4.0.3
 mmengine>=0.10.0
 mmpretrain>=1.2.0
-mmseg>=1.2.0
+mmsegmentation>=1.2.0
+

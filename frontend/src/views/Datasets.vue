@@ -64,11 +64,12 @@
         </el-form-item>
         <el-form-item label="数据格式" prop="format">
           <el-select v-model="uploadForm.format" placeholder="请选择数据格式" style="width: 100%">
-            <el-option label="YOLO格式" value="yolo" />
-            <el-option label="COCO格式" value="coco" />
-            <el-option label="ImageFolder格式" value="imagefolder" />
-            <el-option label="文本CSV" value="csv" />
-            <el-option label="文本JSONL" value="jsonl" />
+            <el-option label="YOLO 检测数据集" value="yolo" />
+            <el-option label="COCO 数据集" value="coco" />
+            <el-option label="ImageFolder 分类数据集" value="imagefolder" />
+            <el-option label="MMSeg 语义分割数据集" value="mmseg" />
+            <el-option label="CSV 数据集" value="csv" />
+            <el-option label="JSONL 数据集" value="jsonl" />
           </el-select>
         </el-form-item>
         <el-form-item label="数据集文件" prop="file">
