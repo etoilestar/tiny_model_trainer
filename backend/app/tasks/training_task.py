@@ -59,6 +59,9 @@ def run_training_job(self, job_id: int) -> dict:
         elif trainer_type == 'bert':
             from ..trainers.bert_trainer import BERTTrainer
             trainer = BERTTrainer()
+        elif trainer_type in ('resnet', 'unet'):
+            from ..trainers.openmmlab_trainer import OpenMMLabTrainer
+            trainer = OpenMMLabTrainer()
         else:
             raise ValueError(f'不支持的训练器类型: {trainer_type}')
 
