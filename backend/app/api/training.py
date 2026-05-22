@@ -58,8 +58,8 @@ def create_job():
 
     # Validate trainer_type
     trainer_type = config.get('trainer_type', '')
-    if trainer_type not in ('yolo', 'bert'):
-        return err('不支持的训练器类型，支持: yolo, bert')
+    if trainer_type not in ('yolo', 'bert', 'resnet', 'unet'):
+        return err('不支持的训练器类型，支持: yolo, bert, resnet, unet')
 
     # Validate dataset
     dataset_id = config.get('dataset_id')
