@@ -50,7 +50,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     platform: linux/${PLATFORM:-amd64}
-    command: celery -A celery_worker.celery worker --loglevel=info --concurrency=2
+    command: celery -A celery_worker.celery worker --loglevel=info --pool=solo --concurrency=1 -Ofair
     environment:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-change-me-in-production}

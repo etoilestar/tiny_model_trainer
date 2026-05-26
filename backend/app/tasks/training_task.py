@@ -33,7 +33,6 @@ def run_training_job(self, job_id: int) -> dict:
     if not job:
         return {'error': f'训练任务 {job_id} 不存在'}
 
-    # Mark as running
     job.status = 'running'
     job.started_at = datetime.now(timezone.utc)
     db.session.commit()
@@ -53,6 +52,8 @@ def run_training_job(self, job_id: int) -> dict:
     trainer_type = config.get('trainer_type', '').lower()
 
     try:
+        _write_log(job_id, 'INFO', f'训练器类型: {trainer_type}')
+
         if trainer_type == 'yolo':
             from ..trainers.yolo_trainer import YOLOTrainer
             trainer = YOLOTrainer()
@@ -60,8 +61,10 @@ def run_training_job(self, job_id: int) -> dict:
             from ..trainers.bert_trainer import BERTTrainer
             trainer = BERTTrainer()
         elif trainer_type in ('resnet', 'unet'):
-            from ..trainers.openmmlab_trainer import OpenMMLabTrainer
-            trainer = OpenMMLabTrainer()
+            # NativeVisionTrainer launches torchrun as a subprocess. This keeps
+            # Celery alive even if a low-level CUDA/C++ extension crashes.
+            from ..trainers.native_vision_trainer import NativeVisionTrainer
+            trainer = NativeVisionTrainer()
         else:
             raise ValueError(f'不支持的训练器类型: {trainer_type}')
 
@@ -73,7 +76,6 @@ def run_training_job(self, job_id: int) -> dict:
 
         result = trainer.train(config, log_cb, metric_cb)
 
-        # Register the trained model if a checkpoint was produced
         best_model_path = result.get('best_model_path')
         if best_model_path:
             registry_entry = ModelRegistry(
@@ -99,7 +101,6 @@ def run_training_job(self, job_id: int) -> dict:
         _write_log(job_id, 'ERROR', f'训练过程发生异常: {exc}')
         _write_log(job_id, 'ERROR', f'详细错误:\n{error_detail}')
 
-        # Refresh job in case of stale state
         db.session.expire(job)
         job = db.session.get(TrainingJob, job_id)
         if job and job.status not in ('stopped',):
