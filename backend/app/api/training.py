@@ -14,6 +14,9 @@ from .utils import sanitize_str, clean_response
 training_bp = Blueprint('training', __name__)
 
 
+SUPPORTED_TRAINER_TYPES = ('yolo', 'bert', 'resnet', 'mobilenet', 'efficientnet', 'unet')
+
+
 def ok(data=None, message='成功'):
     return jsonify({'code': 0, 'data': data, 'message': message})
 
@@ -57,9 +60,10 @@ def create_job():
         return err('无权访问该项目', 403)
 
     # Validate trainer_type
-    trainer_type = config.get('trainer_type', '')
-    if trainer_type not in ('yolo', 'bert', 'resnet', 'unet'):
-        return err('不支持的训练器类型，支持: yolo, bert, resnet, unet')
+    trainer_type = str(config.get('trainer_type', '')).lower().strip()
+    config['trainer_type'] = trainer_type
+    if trainer_type not in SUPPORTED_TRAINER_TYPES:
+        return err('不支持的训练器类型，支持: ' + ', '.join(SUPPORTED_TRAINER_TYPES))
 
     # Validate dataset
     dataset_id = config.get('dataset_id')
@@ -166,6 +170,7 @@ def get_logs(job_id):
             .order_by(TrainingLog.id)
             .all())
     return ok(clean_response([log.to_dict() for log in logs]))
+
 
 @training_bp.route('/jobs/<int:job_id>/stream')
 @training_bp.route('/jobs/<int:job_id>/logs/stream')

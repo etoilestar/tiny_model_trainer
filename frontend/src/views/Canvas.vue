@@ -89,6 +89,42 @@
             </div>
 
             <div
+              class="palette-item model-item mobilenet-model-item"
+              data-node-type="mobilenetModel"
+              draggable="true"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
+              @dragend="onDragEnd"
+            >
+              <el-icon><setting /></el-icon>
+              <span>MobileNet模型节点</span>
+            </div>
+
+            <div
+              class="palette-item model-item efficientnet-model-item"
+              data-node-type="efficientnetModel"
+              draggable="true"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
+              @dragend="onDragEnd"
+            >
+              <el-icon><setting /></el-icon>
+              <span>EfficientNet模型节点</span>
+            </div>
+
+            <div
+              class="palette-item model-item unet-model-item"
+              data-node-type="unetModel"
+              draggable="true"
+              @pointerdown="setPendingNodeTypeFromEvent"
+              @dragstart="onDragStart($event)"
+              @dragend="onDragEnd"
+            >
+              <el-icon><setting /></el-icon>
+              <span>UNet模型节点</span>
+            </div>
+
+            <div
               class="palette-item model-item bert-model-item"
               data-node-type="bertModel"
               draggable="true"
@@ -133,9 +169,7 @@
         </div>
 
         <!-- Center: Vue Flow canvas -->
-        <div
-          class="flow-wrapper"
-        >
+        <div class="flow-wrapper">
           <VueFlow
             :id="FLOW_ID"
             v-model:nodes="nodes"
@@ -234,7 +268,7 @@
                 <el-form-item label="模型文件/路径">
                   <el-input
                     v-model="selectedNode.data.modelName"
-                    placeholder="如 yolov8n.pt / resnet101"
+                    placeholder="如 yolov8n.pt / resnet18 / mobilenet_v3_small / efficientnet_b0 / unet"
                     @input="updateNodeData"
                   />
                 </el-form-item>
@@ -244,12 +278,31 @@
                 </el-form-item>
 
                 <el-alert
-                  v-if="selectedNode.data.framework === 'resnet'"
-                  title="当前前端已支持 ResNet 配置，但后端还需要实现 ResNetTrainer 才能真正训练。"
-                  type="warning"
+                  v-if="['resnet', 'mobilenet', 'efficientnet'].includes(selectedNode.data.framework)"
+                  title="分类模型使用 ImageFolder 数据集：train/class_x/*.jpg，可选 val/class_x/*.jpg；建议输入尺寸 224。"
+                  type="info"
                   :closable="false"
                   show-icon
                 />
+
+                <template v-if="selectedNode.data.framework === 'unet'">
+                  <el-form-item label="类别数 num_classes">
+                    <el-input-number
+                      v-model="selectedNode.data.numClasses"
+                      :min="2"
+                      :max="255"
+                      style="width:100%"
+                      @change="updateNodeData"
+                    />
+                  </el-form-item>
+
+                  <el-alert
+                    title="UNet 分割使用 MMSeg-like 数据集：images/train、images/val、annotations/train、annotations/val；mask 为单通道类别索引 PNG。"
+                    type="info"
+                    :closable="false"
+                    show-icon
+                  />
+                </template>
 
                 <el-alert
                   v-if="selectedNode.data.framework === 'bert'"
@@ -371,6 +424,16 @@
                     v-model="selectedNode.data.workers"
                     :min="0"
                     :max="16"
+                    style="width:100%"
+                    @change="updateNodeData"
+                  />
+                </el-form-item>
+
+                <el-form-item label="DDP 进程数">
+                  <el-input-number
+                    v-model="selectedNode.data.nprocPerNode"
+                    :min="1"
+                    :max="8"
                     style="width:100%"
                     @change="updateNodeData"
                   />
@@ -511,9 +574,37 @@ function getDefaultNodeData(type) {
       label: 'ResNet模型',
       familyLabel: 'ResNet',
       framework: 'resnet',
-      modelVersion: 'resnet101',
-      modelName: 'resnet101',
+      modelVersion: 'resnet18',
+      modelName: 'resnet18',
       pretrained: true
+    },
+
+    mobilenetModel: {
+      label: 'MobileNet模型',
+      familyLabel: 'MobileNetV3',
+      framework: 'mobilenet',
+      modelVersion: 'mobilenet_v3_small',
+      modelName: 'mobilenet_v3_small',
+      pretrained: true
+    },
+
+    efficientnetModel: {
+      label: 'EfficientNet模型',
+      familyLabel: 'EfficientNet',
+      framework: 'efficientnet',
+      modelVersion: 'efficientnet_b0',
+      modelName: 'efficientnet_b0',
+      pretrained: true
+    },
+
+    unetModel: {
+      label: 'UNet模型',
+      familyLabel: 'UNet',
+      framework: 'unet',
+      modelVersion: 'unet',
+      modelName: 'unet',
+      pretrained: false,
+      numClasses: 2
     },
 
     bertModel: {
@@ -539,6 +630,7 @@ function getDefaultNodeData(type) {
       weightDecay: '0.0005',
       patience: 50,
       workers: 0,
+      nprocPerNode: 1,
       device: 'cuda'
     },
 
@@ -561,6 +653,9 @@ function miniMapNodeColor(node) {
     model: '#722ed1',
     yoloModel: '#13c2c2',
     resnetModel: '#722ed1',
+    mobilenetModel: '#2f54eb',
+    efficientnetModel: '#389e0d',
+    unetModel: '#fa541c',
     bertModel: '#2f54eb',
 
     trainConfig: '#fa8c16',
@@ -587,7 +682,7 @@ function onDragEnd() {
   _dragNodeType = null
 }
 
-const MODEL_NODE_TYPES = new Set(['model', 'yoloModel', 'resnetModel', 'bertModel'])
+const MODEL_NODE_TYPES = new Set(['model', 'yoloModel', 'resnetModel', 'mobilenetModel', 'efficientnetModel', 'unetModel', 'bertModel'])
 
 const MODEL_VERSION_OPTIONS = {
   yolo: [
@@ -603,6 +698,17 @@ const MODEL_VERSION_OPTIONS = {
     { label: 'ResNet-50', value: 'resnet50', modelName: 'resnet50' },
     { label: 'ResNet-101', value: 'resnet101', modelName: 'resnet101' },
     { label: 'ResNet-152', value: 'resnet152', modelName: 'resnet152' }
+  ],
+  mobilenet: [
+    { label: 'MobileNetV3 Small', value: 'mobilenet_v3_small', modelName: 'mobilenet_v3_small' },
+    { label: 'MobileNetV3 Large', value: 'mobilenet_v3_large', modelName: 'mobilenet_v3_large' }
+  ],
+  efficientnet: [
+    { label: 'EfficientNet-B0', value: 'efficientnet_b0', modelName: 'efficientnet_b0' }
+  ],
+  unet: [
+    { label: 'UNet', value: 'unet', modelName: 'unet' },
+    { label: 'UNet Small', value: 'unet_small', modelName: 'unet_small' }
   ],
   bert: [
     { label: 'BERT Base Chinese', value: 'bert-base-chinese', modelName: 'bert-base-chinese' },
@@ -640,6 +746,9 @@ const validNodeTypes = new Set([
   'model',
   'yoloModel',
   'resnetModel',
+  'mobilenetModel',
+  'efficientnetModel',
+  'unetModel',
   'bertModel',
   'trainConfig',
   'eval'
@@ -672,6 +781,9 @@ const allowedConnectionMap = {
   model: ['trainConfig'],
   yoloModel: ['trainConfig'],
   resnetModel: ['trainConfig'],
+  mobilenetModel: ['trainConfig'],
+  efficientnetModel: ['trainConfig'],
+  unetModel: ['trainConfig'],
   bertModel: ['trainConfig'],
 
   trainConfig: ['eval'],
@@ -685,6 +797,9 @@ const connectionTipMap = {
   model: '模型节点只能连接到训练配置节点',
   yoloModel: 'YOLO模型节点只能连接到训练配置节点',
   resnetModel: 'ResNet模型节点只能连接到训练配置节点',
+  mobilenetModel: 'MobileNet模型节点只能连接到训练配置节点',
+  efficientnetModel: 'EfficientNet模型节点只能连接到训练配置节点',
+  unetModel: 'UNet模型节点只能连接到训练配置节点',
   bertModel: 'BERT模型节点只能连接到训练配置节点',
 
   trainConfig: '训练配置节点只能连接到评估节点',
@@ -799,12 +914,12 @@ function getSingleModelNode() {
   const matched = nodes.value.filter(n => isModelNode(n))
 
   if (matched.length === 0) {
-    ElMessage.warning('请添加模型节点，例如 YOLO模型节点')
+    ElMessage.warning('请添加模型节点，例如 YOLO、ResNet、MobileNet、EfficientNet 或 UNet 模型节点')
     return null
   }
 
   if (matched.length > 1) {
-    ElMessage.warning('当前暂时只支持一个模型节点，请只保留 YOLO、ResNet、BERT 中的一种')
+    ElMessage.warning('当前暂时只支持一个模型节点，请只保留 YOLO、ResNet、MobileNet、EfficientNet、UNet、BERT 中的一种')
     return null
   }
 
@@ -880,7 +995,16 @@ function normalizeTrainerType(framework) {
     yolov8: 'yolo',
     ultralytics: 'yolo',
     bert: 'bert',
-    resnet: 'resnet'
+    resnet: 'resnet',
+    mobilenet: 'mobilenet',
+    mobilenetv3: 'mobilenet',
+    mobile_net: 'mobilenet',
+    efficientnet: 'efficientnet',
+    efficientnet_b0: 'efficientnet',
+    efficient_net: 'efficientnet',
+    unet: 'unet',
+    segmentation: 'unet',
+    semantic_segmentation: 'unet'
   }
 
   return aliasMap[value] || value
@@ -895,6 +1019,9 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
   const weightDecay = parseFloat(trainConfigNode.data.weightDecay)
 
   const trainerType = normalizeTrainerType(modelNode.data.framework)
+  const parsedNumClasses = Number(modelNode.data.numClasses)
+  const numClasses = Number.isFinite(parsedNumClasses)
+    ? parsedNumClasses : (trainerType === 'unet' ? 2 : undefined)
 
   return {
     name: workflowName.value,
@@ -909,6 +1036,7 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
       model_version: modelNode.data.modelVersion,
       model_name: modelNode.data.modelName,
       pretrained: !!modelNode.data.pretrained,
+      num_classes: numClasses,
 
       dataset_id: datasetNode.data.datasetId,
 
@@ -939,6 +1067,7 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
 
       patience: trainConfigNode.data.patience ?? 50,
       workers: trainConfigNode.data.workers ?? 0,
+      nproc_per_node: trainConfigNode.data.nprocPerNode ?? 1,
 
       device: trainConfigNode.data.device || 'cpu',
 
@@ -1182,6 +1311,7 @@ onMounted(async () => {
 .dataset-item { background: linear-gradient(135deg, #1890ff, #096dd9); }
 .process-item { background: linear-gradient(135deg, #722ed1, #531dab); }
 .model-item { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+.unet-model-item { background: linear-gradient(135deg, #fa541c, #d4380d); }
 .trainconfig-item { background: linear-gradient(135deg, #fa8c16, #d46b08); }
 .eval-item { background: linear-gradient(135deg, #52c41a, #389e0d); }
 

@@ -85,28 +85,84 @@ def get_device(config: dict) -> torch.device:
 
 
 # ---------------------------------------------------------------------------
-# Classification: ImageFolder + torchvision ResNet
+# Classification: ImageFolder + torchvision small models
 # ---------------------------------------------------------------------------
 
 
-def build_resnet_model(model_name: str, num_classes: int) -> nn.Module:
-    name = model_name.lower().strip()
+def _replace_classifier_head(model: nn.Module, num_classes: int) -> nn.Module:
+    """Replace the final classifier layer for common torchvision models."""
+    if hasattr(model, "fc") and isinstance(model.fc, nn.Linear):
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, num_classes)
+        return model
+
+    classifier = getattr(model, "classifier", None)
+    if isinstance(classifier, nn.Sequential):
+        for idx in range(len(classifier) - 1, -1, -1):
+            layer = classifier[idx]
+            if isinstance(layer, nn.Linear):
+                classifier[idx] = nn.Linear(layer.in_features, num_classes)
+                return model
+    if isinstance(classifier, nn.Linear):
+        model.classifier = nn.Linear(classifier.in_features, num_classes)
+        return model
+
+    raise ValueError(f"无法自动替换分类头: {model.__class__.__name__}")
+
+
+def normalize_classification_model_name(task: str, model_name: str) -> str:
+    name = (model_name or "").lower().strip().replace("-", "_")
+    if task == "resnet":
+        return name or "resnet18"
+    if task == "mobilenet":
+        alias = {
+            "mobilenetv3_small": "mobilenet_v3_small",
+            "mobilenetv3_large": "mobilenet_v3_large",
+            "mobilenet_small": "mobilenet_v3_small",
+            "mobilenet_large": "mobilenet_v3_large",
+            "mobilenet": "mobilenet_v3_small",
+        }
+        return alias.get(name, name or "mobilenet_v3_small")
+    if task == "efficientnet":
+        alias = {
+            "efficientnet": "efficientnet_b0",
+            "efficientnetb0": "efficientnet_b0",
+            "efficientnet_b0": "efficientnet_b0",
+        }
+        return alias.get(name, name or "efficientnet_b0")
+    return name
+
+
+def build_classification_model(task: str, model_name: str, num_classes: int) -> nn.Module:
+    task = task.lower().strip()
+    name = normalize_classification_model_name(task, model_name)
+
     builders = {
         "resnet18": models.resnet18,
         "resnet34": models.resnet34,
         "resnet50": models.resnet50,
         "resnet101": models.resnet101,
         "resnet152": models.resnet152,
+        "mobilenet_v3_small": models.mobilenet_v3_small,
+        "mobilenet_v3_large": models.mobilenet_v3_large,
+        "efficientnet_b0": models.efficientnet_b0,
     }
-    if name not in builders:
-        raise ValueError(f"不支持的 ResNet 模型: {model_name}，支持: {', '.join(sorted(builders))}")
+    allowed_by_task = {
+        "resnet": {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"},
+        "mobilenet": {"mobilenet_v3_small", "mobilenet_v3_large"},
+        "efficientnet": {"efficientnet_b0"},
+    }
+
+    allowed = allowed_by_task.get(task)
+    if not allowed:
+        raise ValueError(f"不支持的分类任务类型: {task}")
+    if name not in allowed:
+        raise ValueError(f"{task} 不支持模型: {model_name}，支持: {', '.join(sorted(allowed))}")
 
     # 默认不自动下载预训练权重，保证离线环境可运行。
     # 如需加载预训练权重，建议后续扩展为从 /app/models 加载本地 checkpoint。
     model = builders[name](weights=None)
-    in_features = model.fc.in_features
-    model.fc = nn.Linear(in_features, num_classes)
-    return model
+    return _replace_classifier_head(model, num_classes)
 
 
 def build_classification_loaders(config: dict) -> Tuple[DataLoader, DataLoader, int, List[str]]:
@@ -484,13 +540,19 @@ def main() -> None:
         run_dir = Path(config.get("run_dir") or config.get("checkpoint_dir") or "./checkpoints").resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        if task == "resnet":
+        if task in {"resnet", "mobilenet", "efficientnet"}:
             train_loader, val_loader, num_classes, class_names = build_classification_loaders(config)
-            model_name = str(config.get("model_name") or config.get("model_version") or "resnet18")
-            model = build_resnet_model(model_name, num_classes)
+            default_model = {
+                "resnet": "resnet18",
+                "mobilenet": "mobilenet_v3_small",
+                "efficientnet": "efficientnet_b0",
+            }[task]
+            model_name = str(config.get("model_name") or config.get("model_version") or default_model)
+            model = build_classification_model(task, model_name, num_classes)
+            resolved_name = normalize_classification_model_name(task, model_name)
             criterion = nn.CrossEntropyLoss()
             best_metric_name = "accuracy"
-            log("INFO", f"ResNet 分类任务: model={model_name}, num_classes={num_classes}, classes={class_names}")
+            log("INFO", f"{task.upper()} 分类任务: model={resolved_name}, num_classes={num_classes}, classes={class_names}")
 
         elif task == "unet":
             train_loader, val_loader, num_classes, class_names = build_segmentation_loaders(config)

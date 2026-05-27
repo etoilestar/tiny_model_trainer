@@ -20,6 +20,8 @@ class NativeVisionTrainer(BaseTrainer):
 
     Supported trainer_type values:
       - resnet: ImageFolder classification
+      - mobilenet: ImageFolder classification
+      - efficientnet: ImageFolder classification
       - unet: image/mask semantic segmentation
 
     The subprocess writes JSONL events to stdout. This launcher forwards those
@@ -33,7 +35,7 @@ class NativeVisionTrainer(BaseTrainer):
         metric_callback: Callable[[int, str, float, int], None],
     ) -> dict:
         trainer_type = str(config.get("trainer_type", "")).lower().strip()
-        if trainer_type not in {"resnet", "unet"}:
+        if trainer_type not in {"resnet", "mobilenet", "efficientnet", "unet"}:
             raise ValueError(f"NativeVisionTrainer 不支持的 trainer_type: {trainer_type}")
 
         dataset_path = config.get("dataset_path")

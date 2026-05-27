@@ -43,6 +43,9 @@ const familyLabel = computed(() => {
   const map = {
     yolo: 'YOLO',
     resnet: 'ResNet',
+    mobilenet: 'MobileNetV3',
+    efficientnet: 'EfficientNet',
+    unet: 'UNet',
     bert: 'BERT',
     custom: '自定义'
   }
@@ -53,6 +56,9 @@ const title = computed(() => {
   const map = {
     yolo: 'YOLO 模型',
     resnet: 'ResNet 模型',
+    mobilenet: 'MobileNet 模型',
+    efficientnet: 'EfficientNet 模型',
+    unet: 'UNet 模型',
     bert: 'BERT 模型',
     custom: '自定义模型'
   }
@@ -93,6 +99,18 @@ const title = computed(() => {
 
 .model-node-resnet .node-header {
   background: linear-gradient(135deg, #722ed1, #531dab);
+}
+
+.model-node-mobilenet .node-header {
+  background: linear-gradient(135deg, #2f54eb, #1d39c4);
+}
+
+.model-node-efficientnet .node-header {
+  background: linear-gradient(135deg, #389e0d, #237804);
+}
+
+.model-node-unet .node-header {
+  background: linear-gradient(135deg, #fa541c, #d4380d);
 }
 
 .model-node-bert .node-header {

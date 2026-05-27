@@ -60,7 +60,7 @@ def run_training_job(self, job_id: int) -> dict:
         elif trainer_type == 'bert':
             from ..trainers.bert_trainer import BERTTrainer
             trainer = BERTTrainer()
-        elif trainer_type in ('resnet', 'unet'):
+        elif trainer_type in ('resnet', 'mobilenet', 'efficientnet', 'unet'):
             # NativeVisionTrainer launches torchrun as a subprocess. This keeps
             # Celery alive even if a low-level CUDA/C++ extension crashes.
             from ..trainers.native_vision_trainer import NativeVisionTrainer
