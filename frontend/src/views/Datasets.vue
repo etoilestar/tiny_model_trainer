@@ -20,7 +20,7 @@
         empty-text="暂无数据集，请先上传"
       >
         <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column prop="format" label="格式" width="140">
+        <el-table-column prop="format" label="格式" width="160">
           <template #default="{ row }">
             <el-tag>{{ formatLabel(row.format) }}</el-tag>
           </template>
@@ -68,6 +68,7 @@
             <el-option label="COCO 数据集" value="coco" />
             <el-option label="ImageFolder 分类数据集" value="imagefolder" />
             <el-option label="MMSeg 语义分割数据集" value="mmseg" />
+            <el-option label="BERT 文本分类 ZIP 数据集" value="textclass" />
             <el-option label="CSV 数据集" value="csv" />
             <el-option label="JSONL 数据集" value="jsonl" />
           </el-select>
@@ -90,6 +91,14 @@
             </div>
           </el-upload>
         </el-form-item>
+        <el-alert
+          v-if="uploadForm.format === 'textclass'"
+          title="BERT 文本分类 ZIP 需要包含 train.csv，可选 val.csv；CSV 必须有 text,label 两列，label 为从 0 开始的整数。"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px"
+        />
         <el-form-item label="描述">
           <el-input
             v-model="uploadForm.description"
@@ -139,7 +148,15 @@ const uploadRules = {
 }
 
 function formatLabel(fmt) {
-  const map = { yolo: 'YOLO', coco: 'COCO', imagefolder: 'ImageFolder', csv: '文本CSV', jsonl: '文本JSONL' }
+  const map = {
+    yolo: 'YOLO',
+    coco: 'COCO',
+    imagefolder: 'ImageFolder',
+    mmseg: 'MMSeg',
+    textclass: 'BERT文本分类ZIP',
+    csv: '文本CSV',
+    jsonl: '文本JSONL'
+  }
   return map[fmt] || fmt
 }
 
@@ -256,10 +273,6 @@ onMounted(fetchDatasets)
 }
 
 .upload-area {
-  width: 100%;
-}
-
-:deep(.el-upload-dragger) {
   width: 100%;
 }
 </style>

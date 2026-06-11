@@ -25,6 +25,11 @@
         <span class="field-label">模型：</span>
         <span class="field-value">{{ data.modelName || '未设置' }}</span>
       </div>
+
+      <div class="node-field" v-if="data.pretrained !== undefined">
+        <span class="field-label">预训练：</span>
+        <span class="field-value">{{ data.pretrained ? '本地加载' : '随机初始化' }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -43,7 +48,7 @@ const familyLabel = computed(() => {
   const map = {
     yolo: 'YOLO',
     resnet: 'ResNet',
-    mobilenet: 'MobileNetV3',
+    mobilenet: 'MobileNet',
     efficientnet: 'EfficientNet',
     unet: 'UNet',
     bert: 'BERT',
@@ -70,7 +75,7 @@ const title = computed(() => {
 .flow-node {
   border-radius: 10px;
   min-width: 170px;
-  max-width: 240px;
+  max-width: 250px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 2px solid transparent;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -102,15 +107,15 @@ const title = computed(() => {
 }
 
 .model-node-mobilenet .node-header {
-  background: linear-gradient(135deg, #2f54eb, #1d39c4);
+  background: linear-gradient(135deg, #fa8c16, #d46b08);
 }
 
 .model-node-efficientnet .node-header {
-  background: linear-gradient(135deg, #389e0d, #237804);
+  background: linear-gradient(135deg, #52c41a, #389e0d);
 }
 
 .model-node-unet .node-header {
-  background: linear-gradient(135deg, #fa541c, #d4380d);
+  background: linear-gradient(135deg, #eb2f96, #c41d7f);
 }
 
 .model-node-bert .node-header {
@@ -153,6 +158,6 @@ const title = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 150px;
+  max-width: 160px;
 }
 </style>

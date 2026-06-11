@@ -1,7 +1,6 @@
 <template>
   <Layout :full-width="true">
     <div class="canvas-page">
-      <!-- Toolbar -->
       <div class="canvas-toolbar">
         <div class="toolbar-left">
           <el-icon size="18" color="#409EFF"><cpu /></el-icon>
@@ -27,7 +26,6 @@
       </div>
 
       <div class="canvas-body">
-        <!-- Left panel: Node palette -->
         <div class="node-palette">
           <div class="palette-title">节点面板</div>
 
@@ -168,7 +166,6 @@
           </div>
         </div>
 
-        <!-- Center: Vue Flow canvas -->
         <div class="flow-wrapper">
           <VueFlow
             :id="FLOW_ID"
@@ -194,7 +191,6 @@
           </VueFlow>
         </div>
 
-        <!-- Right panel: Node properties -->
         <div class="props-panel" :class="{ 'props-visible': selectedNode }">
           <div class="props-title">
             <el-icon><edit /></el-icon>
@@ -202,7 +198,6 @@
           </div>
 
           <template v-if="selectedNode">
-            <!-- Dataset Node Props -->
             <template v-if="selectedNode.type === 'dataset'">
               <el-form label-position="top" size="small">
                 <el-form-item label="数据集">
@@ -215,7 +210,7 @@
                     <el-option
                       v-for="ds in datasets"
                       :key="ds.id"
-                      :label="ds.name"
+                      :label="`${ds.name} (${formatDataset(ds.format)})`"
                       :value="ds.id"
                     />
                   </el-select>
@@ -226,7 +221,6 @@
               </el-form>
             </template>
 
-            <!-- Process Node Props -->
             <template v-else-if="selectedNode.type === 'process'">
               <el-form label-position="top" size="small">
                 <el-form-item label="处理方式">
@@ -236,13 +230,93 @@
                     <el-option label="分割训练/验证集" value="split" />
                   </el-select>
                 </el-form-item>
+
                 <el-form-item label="验证集比例" v-if="selectedNode.data.method === 'split'">
                   <el-slider v-model="selectedNode.data.valRatio" :min="5" :max="40" :step="5" show-input @change="updateNodeData" />
                 </el-form-item>
+
+                <template v-if="selectedNode.data.method === 'augment'">
+                  <el-divider content-position="left">图像增强配置</el-divider>
+
+                  <el-form-item label="随机水平翻转概率">
+                    <el-slider
+                      v-model="selectedNode.data.augmentation.horizontalFlipProb"
+                      :min="0"
+                      :max="1"
+                      :step="0.05"
+                      show-input
+                      @change="updateNodeData"
+                    />
+                  </el-form-item>
+
+                  <el-form-item label="随机垂直翻转概率">
+                    <el-slider
+                      v-model="selectedNode.data.augmentation.verticalFlipProb"
+                      :min="0"
+                      :max="1"
+                      :step="0.05"
+                      show-input
+                      @change="updateNodeData"
+                    />
+                  </el-form-item>
+
+                  <el-form-item label="随机旋转角度">
+                    <el-input-number
+                      v-model="selectedNode.data.augmentation.rotationDegrees"
+                      :min="0"
+                      :max="45"
+                      :step="1"
+                      style="width:100%"
+                      @change="updateNodeData"
+                    />
+                  </el-form-item>
+
+                  <el-form-item label="随机裁剪缩放">
+                    <el-switch v-model="selectedNode.data.augmentation.randomResizedCrop" @change="updateNodeData" />
+                  </el-form-item>
+
+                  <template v-if="selectedNode.data.augmentation.randomResizedCrop">
+                    <el-form-item label="最小裁剪比例">
+                      <el-slider
+                        v-model="selectedNode.data.augmentation.scaleMin"
+                        :min="0.3"
+                        :max="1"
+                        :step="0.05"
+                        show-input
+                        @change="updateNodeData"
+                      />
+                    </el-form-item>
+
+                    <el-form-item label="最大裁剪比例">
+                      <el-slider
+                        v-model="selectedNode.data.augmentation.scaleMax"
+                        :min="0.3"
+                        :max="1"
+                        :step="0.05"
+                        show-input
+                        @change="updateNodeData"
+                      />
+                    </el-form-item>
+                  </template>
+
+                  <el-divider content-position="left">颜色扰动</el-divider>
+
+                  <el-form-item label="亮度">
+                    <el-slider v-model="selectedNode.data.augmentation.brightness" :min="0" :max="0.8" :step="0.05" show-input @change="updateNodeData" />
+                  </el-form-item>
+                  <el-form-item label="对比度">
+                    <el-slider v-model="selectedNode.data.augmentation.contrast" :min="0" :max="0.8" :step="0.05" show-input @change="updateNodeData" />
+                  </el-form-item>
+                  <el-form-item label="饱和度">
+                    <el-slider v-model="selectedNode.data.augmentation.saturation" :min="0" :max="0.8" :step="0.05" show-input @change="updateNodeData" />
+                  </el-form-item>
+                  <el-form-item label="色相">
+                    <el-slider v-model="selectedNode.data.augmentation.hue" :min="0" :max="0.2" :step="0.01" show-input @change="updateNodeData" />
+                  </el-form-item>
+                </template>
               </el-form>
             </template>
 
-            <!-- Model Node Props -->
             <template v-else-if="isModelNode(selectedNode)">
               <el-form label-position="top" size="small">
                 <el-form-item label="模型类型">
@@ -265,10 +339,10 @@
                   </el-select>
                 </el-form-item>
 
-                <el-form-item label="模型文件/路径">
+                <el-form-item label="模型名称/本地目录名">
                   <el-input
                     v-model="selectedNode.data.modelName"
-                    placeholder="如 yolov8n.pt / resnet18 / mobilenet_v3_small / efficientnet_b0 / unet"
+                    placeholder="如 efficientnet_b0 / resnet18"
                     @input="updateNodeData"
                   />
                 </el-form-item>
@@ -278,35 +352,24 @@
                 </el-form-item>
 
                 <el-alert
-                  v-if="['resnet', 'mobilenet', 'efficientnet'].includes(selectedNode.data.framework)"
-                  title="分类模型使用 ImageFolder 数据集：train/class_x/*.jpg，可选 val/class_x/*.jpg；建议输入尺寸 224。"
+                  v-if="['resnet', 'mobilenet', 'efficientnet'].includes(selectedNode.data.framework) && selectedNode.data.pretrained"
+                  :title="`启用预训练时，后端只会从 /app/models/${selectedNode.data.modelName}/pytorch_model.bin 加载，不会联网下载。宿主机对应 ./models/${selectedNode.data.modelName}/pytorch_model.bin。`"
                   type="info"
                   :closable="false"
                   show-icon
                 />
 
-                <template v-if="selectedNode.data.framework === 'unet'">
-                  <el-form-item label="类别数 num_classes">
-                    <el-input-number
-                      v-model="selectedNode.data.numClasses"
-                      :min="2"
-                      :max="255"
-                      style="width:100%"
-                      @change="updateNodeData"
-                    />
-                  </el-form-item>
-
-                  <el-alert
-                    title="UNet 分割使用 MMSeg-like 数据集：images/train、images/val、annotations/train、annotations/val；mask 为单通道类别索引 PNG。"
-                    type="info"
-                    :closable="false"
-                    show-icon
-                  />
-                </template>
+                <el-alert
+                  v-if="selectedNode.data.framework === 'unet'"
+                  title="UNet 当前使用平台内置轻量原生 PyTorch 结构，暂不加载预训练权重。"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
 
                 <el-alert
                   v-if="selectedNode.data.framework === 'bert'"
-                  title="BERT 节点用于文本任务，数据集和训练器需要走 BERTTrainer。"
+                  title="BERT 模型需要 HuggingFace 格式目录，例如 ./models/bert-base-chinese。"
                   type="info"
                   :closable="false"
                   show-icon
@@ -314,7 +377,6 @@
               </el-form>
             </template>
 
-            <!-- TrainConfig Node Props -->
             <template v-else-if="selectedNode.type === 'trainConfig'">
               <el-form label-position="top" size="small">
                 <el-form-item label="训练轮数 (Epochs)">
@@ -358,7 +420,7 @@
 
                 <el-form-item label="优化器">
                   <el-select v-model="selectedNode.data.optimizer" style="width:100%" @change="updateNodeData">
-                    <el-option label="Auto" value="auto" />
+                    <el-option label="Auto / AdamW" value="auto" />
                     <el-option label="SGD" value="SGD" />
                     <el-option label="Adam" value="Adam" />
                     <el-option label="AdamW" value="AdamW" />
@@ -382,14 +444,6 @@
                     :step="0.5"
                     style="width:100%"
                     @change="updateNodeData"
-                  />
-                </el-form-item>
-
-                <el-form-item label="Warmup Momentum">
-                  <el-input
-                    v-model="selectedNode.data.warmupMomentum"
-                    placeholder="0.8"
-                    @input="updateNodeData"
                   />
                 </el-form-item>
 
@@ -449,17 +503,18 @@
               </el-form>
             </template>
 
-            <!-- Eval Node Props -->
             <template v-else-if="selectedNode.type === 'eval'">
               <el-form label-position="top" size="small">
                 <el-form-item label="评估指标">
                   <el-checkbox-group v-model="selectedNode.data.metrics" @change="updateNodeData">
-                    <el-checkbox label="mAP">mAP</el-checkbox>
-                    <el-checkbox label="Accuracy">Accuracy</el-checkbox>
-                    <el-checkbox label="F1">F1</el-checkbox>
                     <el-checkbox label="Loss">Loss</el-checkbox>
+                    <el-checkbox label="Accuracy">Accuracy</el-checkbox>
                     <el-checkbox label="Precision">Precision</el-checkbox>
                     <el-checkbox label="Recall">Recall</el-checkbox>
+                    <el-checkbox label="F1">F1</el-checkbox>
+                    <el-checkbox label="mIoU">mIoU</el-checkbox>
+                    <el-checkbox label="Pixel Accuracy">Pixel Accuracy</el-checkbox>
+                    <el-checkbox label="mAP">mAP</el-checkbox>
                   </el-checkbox-group>
                 </el-form-item>
                 <el-form-item label="评估频率 (每N轮)">
@@ -524,6 +579,21 @@ function generateNodeId() {
   return `node_${Date.now()}_${nodeIdCounter++}`
 }
 
+function getDefaultAugmentation() {
+  return {
+    horizontalFlipProb: 0.5,
+    verticalFlipProb: 0,
+    rotationDegrees: 0,
+    randomResizedCrop: false,
+    scaleMin: 0.8,
+    scaleMax: 1.0,
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    hue: 0
+  }
+}
+
 function setPendingNodeType(type) {
   _dragNodeType = validNodeTypes.has(type) ? type : null
 }
@@ -548,10 +618,10 @@ function getDefaultNodeData(type) {
     process: {
       label: '数据处理',
       method: 'normalize',
-      valRatio: 20
+      valRatio: 20,
+      augmentation: getDefaultAugmentation()
     },
 
-    // 兼容旧工作流
     model: {
       label: 'YOLO模型',
       familyLabel: 'YOLO',
@@ -581,7 +651,7 @@ function getDefaultNodeData(type) {
 
     mobilenetModel: {
       label: 'MobileNet模型',
-      familyLabel: 'MobileNetV3',
+      familyLabel: 'MobileNet',
       framework: 'mobilenet',
       modelVersion: 'mobilenet_v3_small',
       modelName: 'mobilenet_v3_small',
@@ -603,8 +673,7 @@ function getDefaultNodeData(type) {
       framework: 'unet',
       modelVersion: 'unet',
       modelName: 'unet',
-      pretrained: false,
-      numClasses: 2
+      pretrained: false
     },
 
     bertModel: {
@@ -620,7 +689,7 @@ function getDefaultNodeData(type) {
       label: '训练配置',
       epochs: 50,
       batchSize: 16,
-      imgSize: 640,
+      imgSize: 224,
       learningRate: '0.001',
       optimizer: 'auto',
       scheduler: 'cosine',
@@ -630,13 +699,13 @@ function getDefaultNodeData(type) {
       weightDecay: '0.0005',
       patience: 50,
       workers: 0,
-      nprocPerNode: 1,
-      device: 'cuda'
+      device: 'cuda',
+      nprocPerNode: 1
     },
 
     eval: {
       label: '评估',
-      metrics: ['mAP', 'Loss'],
+      metrics: ['Loss', 'Accuracy'],
       evalEvery: 1
     }
   }
@@ -653,9 +722,9 @@ function miniMapNodeColor(node) {
     model: '#722ed1',
     yoloModel: '#13c2c2',
     resnetModel: '#722ed1',
-    mobilenetModel: '#2f54eb',
-    efficientnetModel: '#389e0d',
-    unetModel: '#fa541c',
+    mobilenetModel: '#fa8c16',
+    efficientnetModel: '#52c41a',
+    unetModel: '#eb2f96',
     bertModel: '#2f54eb',
 
     trainConfig: '#fa8c16',
@@ -682,7 +751,15 @@ function onDragEnd() {
   _dragNodeType = null
 }
 
-const MODEL_NODE_TYPES = new Set(['model', 'yoloModel', 'resnetModel', 'mobilenetModel', 'efficientnetModel', 'unetModel', 'bertModel'])
+const MODEL_NODE_TYPES = new Set([
+  'model',
+  'yoloModel',
+  'resnetModel',
+  'mobilenetModel',
+  'efficientnetModel',
+  'unetModel',
+  'bertModel'
+])
 
 const MODEL_VERSION_OPTIONS = {
   yolo: [
@@ -704,11 +781,20 @@ const MODEL_VERSION_OPTIONS = {
     { label: 'MobileNetV3 Large', value: 'mobilenet_v3_large', modelName: 'mobilenet_v3_large' }
   ],
   efficientnet: [
-    { label: 'EfficientNet-B0', value: 'efficientnet_b0', modelName: 'efficientnet_b0' }
+    { label: 'EfficientNet-B0', value: 'efficientnet_b0', modelName: 'efficientnet_b0' },
+    { label: 'EfficientNet-B1', value: 'efficientnet_b1', modelName: 'efficientnet_b1' },
+    { label: 'EfficientNet-B2', value: 'efficientnet_b2', modelName: 'efficientnet_b2' },
+    { label: 'EfficientNet-B3', value: 'efficientnet_b3', modelName: 'efficientnet_b3' },
+    { label: 'EfficientNet-B4', value: 'efficientnet_b4', modelName: 'efficientnet_b4' },
+    { label: 'EfficientNet-B5', value: 'efficientnet_b5', modelName: 'efficientnet_b5' },
+    { label: 'EfficientNet-B6', value: 'efficientnet_b6', modelName: 'efficientnet_b6' },
+    { label: 'EfficientNet-B7', value: 'efficientnet_b7', modelName: 'efficientnet_b7' },
+    { label: 'EfficientNetV2-S', value: 'efficientnet_v2_s', modelName: 'efficientnet_v2_s' },
+    { label: 'EfficientNetV2-M', value: 'efficientnet_v2_m', modelName: 'efficientnet_v2_m' },
+    { label: 'EfficientNetV2-L', value: 'efficientnet_v2_l', modelName: 'efficientnet_v2_l' }
   ],
   unet: [
-    { label: 'UNet', value: 'unet', modelName: 'unet' },
-    { label: 'UNet Small', value: 'unet_small', modelName: 'unet_small' }
+    { label: 'UNet - Tiny Native', value: 'unet', modelName: 'unet' }
   ],
   bert: [
     { label: 'BERT Base Chinese', value: 'bert-base-chinese', modelName: 'bert-base-chinese' },
@@ -875,8 +961,21 @@ function onConnect(connection) {
   }])
 }
 
+function sanitizeNodeData(type, data = {}) {
+  const merged = { ...getDefaultNodeData(type), ...data }
+  if (type === 'process') {
+    merged.augmentation = { ...getDefaultAugmentation(), ...(data.augmentation || {}) }
+  }
+  return merged
+}
+
 function sanitizeNodes(rawNodes = []) {
-  return rawNodes.filter(n => validNodeTypes.has(n.type))
+  return rawNodes
+    .filter(n => validNodeTypes.has(n.type))
+    .map(n => ({
+      ...n,
+      data: sanitizeNodeData(n.type, n.data || {})
+    }))
 }
 
 function sanitizeEdges(rawEdges = [], validNodes = nodes.value) {
@@ -914,12 +1013,12 @@ function getSingleModelNode() {
   const matched = nodes.value.filter(n => isModelNode(n))
 
   if (matched.length === 0) {
-    ElMessage.warning('请添加模型节点，例如 YOLO、ResNet、MobileNet、EfficientNet 或 UNet 模型节点')
+    ElMessage.warning('请添加模型节点')
     return null
   }
 
   if (matched.length > 1) {
-    ElMessage.warning('当前暂时只支持一个模型节点，请只保留 YOLO、ResNet、MobileNet、EfficientNet、UNet、BERT 中的一种')
+    ElMessage.warning('当前暂时只支持一个模型节点，请只保留一种模型')
     return null
   }
 
@@ -997,14 +1096,8 @@ function normalizeTrainerType(framework) {
     bert: 'bert',
     resnet: 'resnet',
     mobilenet: 'mobilenet',
-    mobilenetv3: 'mobilenet',
-    mobile_net: 'mobilenet',
     efficientnet: 'efficientnet',
-    efficientnet_b0: 'efficientnet',
-    efficient_net: 'efficientnet',
-    unet: 'unet',
-    segmentation: 'unet',
-    semantic_segmentation: 'unet'
+    unet: 'unet'
   }
 
   return aliasMap[value] || value
@@ -1019,9 +1112,6 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
   const weightDecay = parseFloat(trainConfigNode.data.weightDecay)
 
   const trainerType = normalizeTrainerType(modelNode.data.framework)
-  const parsedNumClasses = Number(modelNode.data.numClasses)
-  const numClasses = Number.isFinite(parsedNumClasses)
-    ? parsedNumClasses : (trainerType === 'unet' ? 2 : undefined)
 
   return {
     name: workflowName.value,
@@ -1036,20 +1126,20 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
       model_version: modelNode.data.modelVersion,
       model_name: modelNode.data.modelName,
       pretrained: !!modelNode.data.pretrained,
-      num_classes: numClasses,
 
       dataset_id: datasetNode.data.datasetId,
 
       data_process: processNode
         ? {
             method: processNode.data.method,
-            val_ratio: processNode.data.valRatio
+            val_ratio: processNode.data.valRatio,
+            augmentation: processNode.data.augmentation || getDefaultAugmentation()
           }
         : null,
 
       epochs: trainConfigNode.data.epochs,
       batch_size: trainConfigNode.data.batchSize,
-      img_size: trainConfigNode.data.imgSize || 640,
+      img_size: trainConfigNode.data.imgSize || 224,
 
       lr: Number.isFinite(learningRate) ? learningRate : 0.001,
       learning_rate: Number.isFinite(learningRate) ? learningRate : 0.001,
@@ -1067,9 +1157,9 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
 
       patience: trainConfigNode.data.patience ?? 50,
       workers: trainConfigNode.data.workers ?? 0,
-      nproc_per_node: trainConfigNode.data.nprocPerNode ?? 1,
 
       device: trainConfigNode.data.device || 'cpu',
+      nproc_per_node: trainConfigNode.data.nprocPerNode || 1,
 
       evaluation: evalNode
         ? {
@@ -1093,6 +1183,19 @@ function buildJobDataFromWorkflow(compiledWorkflow) {
       }
     }
   }
+}
+
+function formatDataset(fmt) {
+  const map = {
+    yolo: 'YOLO',
+    coco: 'COCO',
+    imagefolder: 'ImageFolder',
+    mmseg: 'MMSeg',
+    textclass: 'BERT文本分类',
+    csv: 'CSV',
+    jsonl: 'JSONL'
+  }
+  return map[fmt] || fmt
 }
 
 function onNodeClick({ node }) {
@@ -1133,11 +1236,12 @@ async function saveCanvas(showMessage = true) {
   const shouldNotify = showMessage !== false
   saving.value = true
   try {
+    const sanitizedNodes = sanitizeNodes(nodes.value)
     const payload = {
       name: workflowName.value,
       project_id: projectId.value,
-      nodes: sanitizeNodes(nodes.value).map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
-      edges: sanitizeEdges(edges.value, sanitizeNodes(nodes.value)).map(e => ({ id: e.id, source: e.source, target: e.target }))
+      nodes: sanitizedNodes.map(n => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+      edges: sanitizeEdges(edges.value, sanitizedNodes).map(e => ({ id: e.id, source: e.source, target: e.target }))
     }
     if (currentWorkflowId.value) {
       await updateWorkflow(currentWorkflowId.value, payload)
@@ -1251,7 +1355,7 @@ onMounted(async () => {
 }
 
 .node-palette {
-  width: 160px;
+  width: 170px;
   background: #fff;
   border-right: 1px solid #e4e7ed;
   overflow-y: auto;
@@ -1311,7 +1415,12 @@ onMounted(async () => {
 .dataset-item { background: linear-gradient(135deg, #1890ff, #096dd9); }
 .process-item { background: linear-gradient(135deg, #722ed1, #531dab); }
 .model-item { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
-.unet-model-item { background: linear-gradient(135deg, #fa541c, #d4380d); }
+.yolo-model-item { background: linear-gradient(135deg, #13c2c2, #08979c); }
+.resnet-model-item { background: linear-gradient(135deg, #722ed1, #531dab); }
+.mobilenet-model-item { background: linear-gradient(135deg, #fa8c16, #d46b08); }
+.efficientnet-model-item { background: linear-gradient(135deg, #52c41a, #389e0d); }
+.unet-model-item { background: linear-gradient(135deg, #eb2f96, #c41d7f); }
+.bert-model-item { background: linear-gradient(135deg, #2f54eb, #1d39c4); }
 .trainconfig-item { background: linear-gradient(135deg, #fa8c16, #d46b08); }
 .eval-item { background: linear-gradient(135deg, #52c41a, #389e0d); }
 
@@ -1331,7 +1440,7 @@ onMounted(async () => {
 }
 
 .props-panel.props-visible {
-  width: 280px;
+  width: 310px;
   overflow-y: auto;
   padding: 16px;
 }

@@ -1,3 +1,4 @@
+import csv
 import os
 import shutil
 import uuid
@@ -15,19 +16,21 @@ from .utils import sanitize_str, clean_response
 datasets_bp = Blueprint('datasets', __name__)
 
 # Map validated format strings to safe file extensions (no user input used).
-# 注意：yolo/coco 保持原 zip 逻辑；imagefolder/mmseg 上传 zip 后会解压成目录。
+# 注意：
+# - yolo/coco 保持原 zip 逻辑；
+# - imagefolder/mmseg/textclass 上传 zip 后会解压成目录；
+# - csv/jsonl 保持单文件上传，兼容旧逻辑。
 _FMT_EXT = {
     'yolo': '.zip',
     'coco': '.zip',
     'imagefolder': '.zip',
     'mmseg': '.zip',
+    'textclass': '.zip',
     'csv': '.csv',
     'jsonl': '.jsonl',
 }
 
-# 只对 OpenMMLab 需要目录输入的数据格式做自动解压。
-# 这样不会影响现在 YOLO 读取 zip 的逻辑。
-_AUTO_EXTRACT_FORMATS = {'imagefolder', 'mmseg'}
+_AUTO_EXTRACT_FORMATS = {'imagefolder', 'mmseg', 'textclass'}
 
 
 def ok(data=None, message='成功'):
@@ -81,7 +84,7 @@ def _strip_single_top_level_dir(path: str) -> str:
 
 def _validate_imagefolder_dataset(dataset_root: str) -> None:
     """
-    ResNet/mmpretrain 最小分类数据集格式：
+    图像分类最小数据集格式：
 
         root/
           train/
@@ -91,7 +94,7 @@ def _validate_imagefolder_dataset(dataset_root: str) -> None:
             class_a/*.jpg
             class_b/*.jpg
 
-    val 可选；如果没有 val，openmmlab_trainer.py 会退化为用 train 做验证。
+    val 可选；如果没有 val，训练器会退化为用 train 做验证。
     """
     root = Path(dataset_root)
     train_dir = root / 'train'
@@ -116,7 +119,7 @@ def _validate_imagefolder_dataset(dataset_root: str) -> None:
 
 def _validate_mmseg_dataset(dataset_root: str) -> None:
     """
-    UNet/mmseg 最小分割数据集格式：
+    UNet 最小分割数据集格式：
 
         root/
           images/
@@ -149,12 +152,61 @@ def _validate_mmseg_dataset(dataset_root: str) -> None:
         raise ValueError('mmseg 数据集 annotations/train/ 下没有 mask')
 
 
+def _validate_textclass_dataset(dataset_root: str) -> None:
+    """
+    BERT 文本分类 zip 数据集格式：
+
+        root/
+          train.csv
+          val.csv        # 可选
+          labels.json    # 可选
+
+    CSV 必须包含 text,label 两列。
+    """
+    root = Path(dataset_root)
+    train_csv = root / 'train.csv'
+
+    if not train_csv.is_file():
+        raise ValueError('textclass 数据集缺少 train.csv')
+
+    try:
+        with open(train_csv, encoding='utf-8-sig', newline='') as f:
+            reader = csv.DictReader(f)
+            if not reader.fieldnames:
+                raise ValueError('textclass 数据集 train.csv 表头为空')
+            fields = {name.strip() for name in reader.fieldnames}
+            missing = {'text', 'label'} - fields
+            if missing:
+                raise ValueError(f'textclass 数据集 train.csv 缺少列: {", ".join(sorted(missing))}')
+
+            sample_count = 0
+            for row in reader:
+                text = (row.get('text') or '').strip()
+                label = (row.get('label') or '').strip()
+                if not text:
+                    continue
+                try:
+                    int(label)
+                except ValueError as exc:
+                    raise ValueError(f'textclass 数据集 label 必须是整数，发现: {label}') from exc
+                sample_count += 1
+
+            if sample_count == 0:
+                raise ValueError('textclass 数据集 train.csv 没有有效样本')
+    except UnicodeDecodeError as exc:
+        raise ValueError('textclass 数据集 train.csv 必须使用 UTF-8 编码') from exc
+
+    val_csv = root / 'val.csv'
+    if val_csv.exists() and not val_csv.is_file():
+        raise ValueError('textclass 数据集 val.csv 必须是文件')
+
+
 def _prepare_uploaded_dataset(fmt: str, file_path: str) -> str:
     """
     返回最终写入 Dataset.file_path 的路径。
 
     - yolo/coco/csv/jsonl：保持原文件路径，完全不改旧逻辑。
-    - imagefolder/mmseg：解压 zip 并返回解压后的目录路径。
+    - imagefolder/mmseg/textclass：解压 zip 并返回解压后的目录路径。
     """
     if fmt not in _AUTO_EXTRACT_FORMATS:
         return file_path
@@ -170,6 +222,8 @@ def _prepare_uploaded_dataset(fmt: str, file_path: str) -> str:
             _validate_imagefolder_dataset(dataset_root)
         elif fmt == 'mmseg':
             _validate_mmseg_dataset(dataset_root)
+        elif fmt == 'textclass':
+            _validate_textclass_dataset(dataset_root)
 
         return dataset_root
 
@@ -286,16 +340,16 @@ def delete_dataset(dataset_id):
 
     _require_project(dataset.project_id, user_id)
 
-    # yolo/coco/csv/jsonl 一般是文件；imagefolder/mmseg 是自动解压后的目录。
-    if dataset.file_path and os.path.exists(dataset.file_path):
-        try:
+    try:
+        if dataset.file_path:
+            # file_path 可能是普通文件，也可能是自动解压后的目录。
             if os.path.isdir(dataset.file_path):
                 shutil.rmtree(dataset.file_path, ignore_errors=True)
-            else:
+            elif os.path.exists(dataset.file_path):
                 os.remove(dataset.file_path)
-        except OSError:
-            pass
+    except OSError:
+        pass
 
     db.session.delete(dataset)
     db.session.commit()
-    return ok(None, '数据集已删除')
+    return ok(None, '数据集删除成功')
