@@ -3,7 +3,6 @@ import time
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, Response, current_app, abort, stream_with_context
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
 from ..models.training_job import TrainingJob, TrainingLog
@@ -25,22 +24,20 @@ def err(message='操作失败', status=400):
     return jsonify({'code': 1, 'message': message}), status
 
 
-def _require_job(job_id: int, user_id: int) -> TrainingJob:
+def _require_job(job_id: int) -> TrainingJob:
     job = db.session.get(TrainingJob, job_id)
     if not job:
         abort(404, '训练任务不存在')
     project = db.session.get(Project, job.project_id)
-    if not project or project.user_id != user_id:
-        abort(403, '无权访问该训练任务')
+    if not project:
+        abort(404, '项目不存在')
     return job
 
 
 # ── Job CRUD ────────────────────────────────────────────────────────────────
 
 @training_bp.route('/jobs', methods=['POST'])
-@jwt_required()
 def create_job():
-    user_id = int(get_jwt_identity())
     body = request.get_json(silent=True) or {}
 
     project_id = body.get('project_id')
@@ -56,8 +53,6 @@ def create_job():
     project = db.session.get(Project, int(project_id))
     if not project:
         return err('项目不存在', 404)
-    if project.user_id != user_id:
-        return err('无权访问该项目', 403)
 
     # Validate trainer_type
     trainer_type = str(config.get('trainer_type', '')).lower().strip()
@@ -97,16 +92,14 @@ def create_job():
 
 
 @training_bp.route('/jobs', methods=['GET'])
-@jwt_required()
 def list_jobs():
-    user_id = int(get_jwt_identity())
     project_id = request.args.get('project_id', type=int)
     if not project_id:
         return err('缺少 project_id 参数')
 
     project = db.session.get(Project, project_id)
-    if not project or project.user_id != user_id:
-        return err('无权访问该项目', 403)
+    if not project:
+        return err('项目不存在', 404)
 
     jobs = (TrainingJob.query
             .filter_by(project_id=project_id)
@@ -116,18 +109,14 @@ def list_jobs():
 
 
 @training_bp.route('/jobs/<int:job_id>', methods=['GET'])
-@jwt_required()
 def get_job(job_id):
-    user_id = int(get_jwt_identity())
-    job = _require_job(job_id, user_id)
+    job = _require_job(job_id)
     return ok(clean_response(job.to_dict()))
 
 
 @training_bp.route('/jobs/<int:job_id>', methods=['DELETE'])
-@jwt_required()
 def delete_job(job_id):
-    user_id = int(get_jwt_identity())
-    job = _require_job(job_id, user_id)
+    job = _require_job(job_id)
 
     if job.status == 'running':
         return err('运行中的任务无法删除，请先停止')
@@ -138,10 +127,8 @@ def delete_job(job_id):
 
 
 @training_bp.route('/jobs/<int:job_id>/stop', methods=['POST'])
-@jwt_required()
 def stop_job(job_id):
-    user_id = int(get_jwt_identity())
-    job = _require_job(job_id, user_id)
+    job = _require_job(job_id)
 
     if job.status not in ('pending', 'running'):
         return err('该任务当前状态无法停止')
@@ -160,10 +147,8 @@ def stop_job(job_id):
 # ── Logs ────────────────────────────────────────────────────────────────────
 
 @training_bp.route('/jobs/<int:job_id>/logs', methods=['GET'])
-@jwt_required()
 def get_logs(job_id):
-    user_id = int(get_jwt_identity())
-    _require_job(job_id, user_id)
+    _require_job(job_id)
 
     logs = (TrainingLog.query
             .filter_by(job_id=job_id)
@@ -174,11 +159,9 @@ def get_logs(job_id):
 
 @training_bp.route('/jobs/<int:job_id>/stream')
 @training_bp.route('/jobs/<int:job_id>/logs/stream')
-@jwt_required()
 def stream_logs(job_id):
     """SSE endpoint – streams training logs in real time."""
-    user_id = int(get_jwt_identity())
-    _require_job(job_id, user_id)
+    _require_job(job_id)
 
     @stream_with_context
     def generate():

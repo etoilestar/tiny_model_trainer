@@ -1,5 +1,4 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
 from ..models.training_job import Metric
@@ -19,9 +18,7 @@ def err(message='操作失败', status=400):
 
 
 @metrics_bp.route('/', methods=['GET'])
-@jwt_required()
 def get_metrics():
-    user_id = int(get_jwt_identity())
     job_id = request.args.get('job_id', type=int)
     if not job_id:
         return err('缺少 job_id 参数')
@@ -31,8 +28,8 @@ def get_metrics():
         return err('训练任务不存在', 404)
 
     project = db.session.get(Project, job.project_id)
-    if not project or project.user_id != user_id:
-        return err('无权访问该训练任务', 403)
+    if not project:
+        return err('项目不存在', 404)
 
     metric_name = request.args.get('metric_name')
     query = Metric.query.filter_by(job_id=job_id)

@@ -3,8 +3,8 @@
     <div class="projects-page">
       <div class="page-header">
         <div>
-          <h2>我的项目</h2>
-          <p class="subtitle">管理您的模型训练项目</p>
+          <h2>全部项目</h2>
+          <p class="subtitle">管理全部模型训练项目</p>
         </div>
         <el-button type="primary" :icon="Plus" size="large" @click="openCreateDialog">
           新建项目

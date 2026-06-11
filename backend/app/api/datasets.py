@@ -6,7 +6,6 @@ import zipfile
 from pathlib import Path
 
 from flask import Blueprint, request, jsonify, current_app, abort
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
 from ..models.dataset import Dataset, DATASET_FORMATS
@@ -41,12 +40,10 @@ def err(message='操作失败', status=400):
     return jsonify({'code': 1, 'message': message}), status
 
 
-def _require_project(project_id: int, user_id: int) -> Project:
+def _require_project(project_id: int) -> Project:
     project = db.session.get(Project, project_id)
     if not project:
         abort(404, '项目不存在')
-    if project.user_id != user_id:
-        abort(403, '无权访问该项目')
     return project
 
 
@@ -233,23 +230,19 @@ def _prepare_uploaded_dataset(fmt: str, file_path: str) -> str:
 
 
 @datasets_bp.route('/', methods=['GET'])
-@jwt_required()
 def list_datasets():
-    user_id = int(get_jwt_identity())
     project_id = request.args.get('project_id', type=int)
     if not project_id:
         return err('缺少 project_id 参数')
 
-    _require_project(project_id, user_id)
+    _require_project(project_id)
 
     datasets = Dataset.query.filter_by(project_id=project_id).order_by(Dataset.created_at.desc()).all()
     return ok(clean_response([d.to_dict() for d in datasets]))
 
 
 @datasets_bp.route('/', methods=['POST'])
-@jwt_required()
 def upload_dataset():
-    user_id = int(get_jwt_identity())
 
     project_id = request.form.get('project_id', type=int)
     name = sanitize_str((request.form.get('name') or '').strip())
@@ -263,7 +256,7 @@ def upload_dataset():
     if fmt not in DATASET_FORMATS:
         return err(f'不支持的数据集格式，支持: {", ".join(DATASET_FORMATS)}')
 
-    _require_project(project_id, user_id)
+    _require_project(project_id)
 
     if 'file' not in request.files:
         return err('请上传数据集文件')
@@ -319,26 +312,22 @@ def upload_dataset():
 
 
 @datasets_bp.route('/<int:dataset_id>', methods=['GET'])
-@jwt_required()
 def get_dataset(dataset_id):
-    user_id = int(get_jwt_identity())
     dataset = db.session.get(Dataset, dataset_id)
     if not dataset:
         return err('数据集不存在', 404)
 
-    _require_project(dataset.project_id, user_id)
+    _require_project(dataset.project_id)
     return ok(clean_response(dataset.to_dict()))
 
 
 @datasets_bp.route('/<int:dataset_id>', methods=['DELETE'])
-@jwt_required()
 def delete_dataset(dataset_id):
-    user_id = int(get_jwt_identity())
     dataset = db.session.get(Dataset, dataset_id)
     if not dataset:
         return err('数据集不存在', 404)
 
-    _require_project(dataset.project_id, user_id)
+    _require_project(dataset.project_id)
 
     try:
         if dataset.file_path:

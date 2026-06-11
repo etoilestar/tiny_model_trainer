@@ -1,7 +1,8 @@
 import os
 from flask import Flask, jsonify
+from sqlalchemy import inspect, text
 from .config import config_map
-from .extensions import db, jwt, migrate, cors, celery
+from .extensions import db, migrate, cors, celery
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -17,13 +18,10 @@ def create_app(config_name: str | None = None) -> Flask:
         folder = app.config[folder_key]
         os.makedirs(folder, exist_ok=True)
 
-    # Accept routes with or without trailing slash to avoid 308 redirects that
-    # strip the Authorization header when the browser follows cross-origin.
     app.url_map.strict_slashes = False
 
     # Initialize extensions
     db.init_app(app)
-    jwt.init_app(app)
     migrate.init_app(app, db)
     cors.init_app(app, resources={r'/api/*': {'origins': app.config['CORS_ORIGINS']}},
                   supports_credentials=True)
@@ -47,17 +45,15 @@ def create_app(config_name: str | None = None) -> Flask:
     celery.Task = ContextTask
 
     # Import models so Flask-Migrate picks them up
-    from .models import user, project, dataset, workflow, training_job, model_registry  # noqa: F401
+    from .models import project, dataset, workflow, training_job, model_registry  # noqa: F401
 
     # Register blueprints
-    from .api.auth import auth_bp
     from .api.projects import projects_bp
     from .api.datasets import datasets_bp
     from .api.workflows import workflows_bp
     from .api.training import training_bp
     from .api.metrics import metrics_bp
 
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(projects_bp, url_prefix='/api/projects')
     app.register_blueprint(datasets_bp, url_prefix='/api/datasets')
     app.register_blueprint(workflows_bp, url_prefix='/api/workflows')
@@ -74,5 +70,39 @@ def create_app(config_name: str | None = None) -> Flask:
     # Auto-create tables for SQLite development
     with app.app_context():
         db.create_all()
+        _migrate_sqlite_projects_without_users()
 
     return app
+
+
+def _migrate_sqlite_projects_without_users() -> None:
+    """Drop the legacy projects.user_id column from SQLite development DBs."""
+    if db.engine.dialect.name != 'sqlite':
+        return
+
+    inspector = inspect(db.engine)
+    if 'projects' not in inspector.get_table_names():
+        return
+
+    columns = [column['name'] for column in inspector.get_columns('projects')]
+    if 'user_id' not in columns:
+        return
+
+    with db.engine.begin() as connection:
+        connection.execute(text('PRAGMA foreign_keys=OFF'))
+        connection.execute(text('''
+            CREATE TABLE IF NOT EXISTS projects_new (
+                id INTEGER NOT NULL PRIMARY KEY,
+                name VARCHAR(120) NOT NULL,
+                description TEXT,
+                created_at DATETIME,
+                updated_at DATETIME
+            )
+        '''))
+        connection.execute(text('''
+            INSERT INTO projects_new (id, name, description, created_at, updated_at)
+            SELECT id, name, description, created_at, updated_at FROM projects
+        '''))
+        connection.execute(text('DROP TABLE projects'))
+        connection.execute(text('ALTER TABLE projects_new RENAME TO projects'))
+        connection.execute(text('PRAGMA foreign_keys=ON'))
