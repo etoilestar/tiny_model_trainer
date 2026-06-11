@@ -224,8 +224,7 @@ function startSSE() {
     sseSource = null
   }
 
-  const token = localStorage.getItem('token')
-  const url = `/api/training/jobs/${jobId.value}/logs/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  const url = `/api/training/jobs/${jobId.value}/logs/stream`
 
   sseSource = new EventSource(url)
 

@@ -65,29 +65,7 @@
           </el-breadcrumb>
         </div>
         <div class="header-title">可视化小模型训练平台</div>
-        <div class="header-right">
-          <el-dropdown trigger="click" @command="handleUserCommand">
-            <div class="user-info">
-              <el-avatar size="32" :style="{ background: '#409EFF', fontSize: '14px' }">
-                {{ userInitial }}
-              </el-avatar>
-              <span class="username">{{ username }}</span>
-              <el-icon class="el-icon--right"><arrow-down /></el-icon>
-            </div>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item disabled>
-                  <el-icon><user /></el-icon>
-                  {{ username }}
-                </el-dropdown-item>
-                <el-dropdown-item divided command="logout">
-                  <el-icon><switch-button /></el-icon>
-                  退出登录
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
+        <div class="header-spacer"></div>
       </div>
 
       <!-- Page content -->
@@ -100,12 +78,10 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
+import { useRoute } from 'vue-router'
 import { useProjectStore } from '@/stores/project'
 
-const props = defineProps({
+defineProps({
   fullWidth: {
     type: Boolean,
     default: false
@@ -113,8 +89,6 @@ const props = defineProps({
 })
 
 const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
 const projectStore = useProjectStore()
 
 const sidebarCollapsed = ref(false)
@@ -137,20 +111,6 @@ const currentPageTitle = computed(() => {
   }
   return routeMap[route.name] || ''
 })
-
-const username = computed(() => authStore.user?.username || authStore.user?.name || '用户')
-const userInitial = computed(() => (username.value || 'U')[0].toUpperCase())
-
-async function handleUserCommand(cmd) {
-  if (cmd === 'logout') {
-    await ElMessageBox.confirm('确认退出登录吗？', '退出确认', {
-      type: 'warning',
-      confirmButtonText: '退出',
-      cancelButtonText: '取消'
-    })
-    authStore.logout()
-  }
-}
 </script>
 
 <style scoped>
@@ -265,33 +225,8 @@ async function handleUserCommand(cmd) {
   white-space: nowrap;
 }
 
-.header-right {
+.header-spacer {
   flex: 1;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.user-info:hover {
-  background: #f5f7fa;
-}
-
-.username {
-  font-size: 14px;
-  color: #303133;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .page-content {

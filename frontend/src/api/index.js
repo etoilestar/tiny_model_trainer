@@ -1,34 +1,14 @@
 import axios from 'axios'
-import router from '@/router'
 
 const api = axios.create({
   baseURL: '/api',
   timeout: 30000
 })
 
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
 api.interceptors.response.use(
   response => response.data,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      router.push('/login')
-    }
-    return Promise.reject(error)
-  }
+  error => Promise.reject(error)
 )
-
-// Auth
-export const login = (data) => api.post('/auth/login', data)
-export const register = (data) => api.post('/auth/register', data)
-export const getMe = () => api.get('/auth/me')
 
 // Projects
 export const getProjects = () => api.get('/projects')
