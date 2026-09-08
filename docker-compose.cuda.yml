@@ -1,0 +1,17 @@
+# A800/x86 CUDA overlay:
+# docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build
+services:
+  backend:
+    environment:
+      DEVICE_TYPE: cuda
+
+  worker:
+    environment:
+      DEVICE_TYPE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

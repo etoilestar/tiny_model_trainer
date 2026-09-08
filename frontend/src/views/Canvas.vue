@@ -496,8 +496,11 @@
                 <el-form-item label="设备">
                   <el-select v-model="selectedNode.data.device" style="width:100%" @change="updateNodeData">
                     <el-option label="CPU" value="cpu" />
-                    <el-option label="GPU 0" value="0" />
+                    <el-option label="自动选择" value="auto" />
                     <el-option label="CUDA 自动" value="cuda" />
+                    <el-option label="GPU 0" value="cuda:0" />
+                    <el-option label="昇腾 NPU 自动" value="npu" />
+                    <el-option label="NPU 0" value="npu:0" />
                   </el-select>
                 </el-form-item>
               </el-form>
@@ -699,7 +702,7 @@ function getDefaultNodeData(type) {
       weightDecay: '0.0005',
       patience: 50,
       workers: 0,
-      device: 'cuda',
+      device: 'auto',
       nprocPerNode: 1
     },
 

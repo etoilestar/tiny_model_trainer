@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+# Use an official/vendor-provided ARM64 Ascend PyTorch image whose CANN,
+# PyTorch and torch_npu versions match the driver installed on the host.
+ARG ASCEND_BASE_IMAGE
+FROM ${ASCEND_BASE_IMAGE}
+
+WORKDIR /app
+
+COPY requirements-ascend.txt /tmp/requirements-ascend.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements-ascend.txt \
+    && python -c "import torch, torch_npu; assert hasattr(torch, 'npu')"
+
+COPY . .
+RUN mkdir -p /app/data /app/uploads /app/models /app/checkpoints
+
+ENV DEVICE_TYPE=npu \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 5000
+CMD ["python", "run.py"]

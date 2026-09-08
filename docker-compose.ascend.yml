@@ -1,0 +1,33 @@
+# Ascend 910B/ARM64 overlay. Add one /dev/davinciN mapping per NPU used.
+# ASCEND_BASE_IMAGE must point to a matching CANN + torch + torch_npu image.
+services:
+  backend:
+    platform: linux/arm64
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ascend
+      args:
+        ASCEND_BASE_IMAGE: ${ASCEND_BASE_IMAGE:?ASCEND_BASE_IMAGE must be set}
+    environment:
+      DEVICE_TYPE: npu
+
+  worker:
+    platform: linux/arm64
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.ascend
+      args:
+        ASCEND_BASE_IMAGE: ${ASCEND_BASE_IMAGE:?ASCEND_BASE_IMAGE must be set}
+    environment:
+      DEVICE_TYPE: npu
+      ASCEND_RT_VISIBLE_DEVICES: ${ASCEND_RT_VISIBLE_DEVICES:-0}
+      HCCL_CONNECT_TIMEOUT: ${HCCL_CONNECT_TIMEOUT:-1800}
+    shm_size: 8g
+    devices:
+      - /dev/davinci0:/dev/davinci0
+      - /dev/davinci_manager:/dev/davinci_manager
+      - /dev/devmm_svm:/dev/devmm_svm
+      - /dev/hisi_hdc:/dev/hisi_hdc
+    volumes:
+      - /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro
+      - /etc/ascend_install.info:/etc/ascend_install.info:ro
