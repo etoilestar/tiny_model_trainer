@@ -41,8 +41,8 @@
 
       <div class="node-field">
         <span class="field-label">设备：</span>
-        <el-tag size="small" :type="data.device === 'cuda' || data.device === '0' ? 'success' : 'info'">
-          {{ data.device === 'cuda' || data.device === '0' ? 'GPU' : 'CPU' }}
+        <el-tag size="small" :type="deviceTagType">
+          {{ deviceLabel }}
         </el-tag>
       </div>
     </div>
@@ -57,6 +57,19 @@ const props = defineProps({
   id: String,
   data: { type: Object, default: () => ({}) },
   selected: { type: Boolean, default: false }
+})
+
+const normalizedDevice = computed(() => String(props.data.device || 'auto').toLowerCase())
+const deviceLabel = computed(() => {
+  if (normalizedDevice.value.startsWith('npu')) return 'NPU'
+  if (normalizedDevice.value.startsWith('cuda') || normalizedDevice.value === '0') return 'GPU'
+  if (normalizedDevice.value === 'auto') return '自动'
+  return 'CPU'
+})
+const deviceTagType = computed(() => {
+  if (deviceLabel.value === 'NPU') return 'warning'
+  if (deviceLabel.value === 'GPU') return 'success'
+  return 'info'
 })
 
 const optimizerLabel = computed(() => {

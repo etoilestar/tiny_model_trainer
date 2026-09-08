@@ -5,6 +5,8 @@ from typing import Callable, List, Sequence, Tuple
 import torch
 from torch.utils.data import DataLoader, Dataset as TorchDataset
 
+from .device import resolve_accelerator
+
 from .base import BaseTrainer
 
 
@@ -193,7 +195,7 @@ class BERTTrainer(BaseTrainer):
         if not val_samples:
             val_samples = train_samples
 
-        device = torch.device('cuda' if torch.cuda.is_available() and str(config.get('device', 'cuda')).lower() != 'cpu' else 'cpu')
+        device = resolve_accelerator(config.get('device', 'auto')).device
         log_callback('INFO', f'使用设备: {device}')
         log_callback('INFO', f'加载 BERT 模型: {model_path}')
         log_callback('INFO', f'文本分类类别数: {num_classes}')

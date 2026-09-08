@@ -14,6 +14,8 @@ from torch.utils.data import DataLoader, Dataset, DistributedSampler
 from torchvision import datasets, models, transforms
 from torchvision.transforms import functional as TF
 
+from app.trainers.device import Accelerator, resolve_accelerator
+
 
 CLASSIFICATION_TASKS = {'resnet', 'mobilenet', 'efficientnet'}
 
@@ -86,17 +88,18 @@ def is_main_process() -> bool:
     return not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0
 
 
-def setup_distributed() -> Tuple[int, int, int]:
+def setup_distributed(config: dict) -> Tuple[int, int, int, Accelerator]:
     if 'RANK' not in os.environ:
-        return 0, 1, 0
+        accelerator = resolve_accelerator(config.get('device', 'auto'), 0)
+        return 0, 1, 0, accelerator
 
     rank = int(os.environ.get('RANK', '0'))
     world_size = int(os.environ.get('WORLD_SIZE', '1'))
     local_rank = int(os.environ.get('LOCAL_RANK', '0'))
 
-    backend = 'nccl' if torch.cuda.is_available() else 'gloo'
-    dist.init_process_group(backend=backend, init_method='env://')
-    return rank, world_size, local_rank
+    accelerator = resolve_accelerator(config.get('device', 'auto'), local_rank)
+    dist.init_process_group(backend=accelerator.distributed_backend, init_method='env://')
+    return rank, world_size, local_rank, accelerator
 
 
 def cleanup_distributed() -> None:
@@ -625,7 +628,7 @@ def train_classification(config: dict, device: torch.device, world_size: int, lo
     model.to(device)
 
     if dist.is_available() and dist.is_initialized():
-        if device.type == 'cuda':
+        if device.type in {'cuda', 'npu'}:
             model = DDP(model, device_ids=[local_rank])
         else:
             model = DDP(model)
@@ -781,7 +784,7 @@ def train_unet(config: dict, device: torch.device, world_size: int, local_rank: 
     model = TinyUNet(num_classes=num_classes).to(device)
 
     if dist.is_available() and dist.is_initialized():
-        if device.type == 'cuda':
+        if device.type in {'cuda', 'npu'}:
             model = DDP(model, device_ids=[local_rank])
         else:
             model = DDP(model)
@@ -930,15 +933,10 @@ def main() -> None:
     with open(args.config, encoding='utf-8') as f:
         config = json.load(f)
 
-    rank, world_size, local_rank = setup_distributed()
+    rank, world_size, local_rank, accelerator = setup_distributed(config)
 
     try:
-        requested_device = str(config.get('device', 'cuda')).lower()
-        if torch.cuda.is_available() and requested_device != 'cpu':
-            torch.cuda.set_device(local_rank)
-            device = torch.device('cuda', local_rank)
-        else:
-            device = torch.device('cpu')
+        device = accelerator.device
 
         if is_main_process():
             emit_log(f'DDP 初始化完成: rank={rank}, world_size={world_size}, local_rank={local_rank}, device={device}')
