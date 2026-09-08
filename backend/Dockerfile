@@ -24,7 +24,7 @@ RUN pip uninstall -y opencv-python opencv-contrib-python opencv-python-headless 
     && pip install --no-cache-dir opencv-python-headless==4.10.0.84 -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # ── ARM64: CPU-only Python 3.11 ────────────────────────────────────────────
-FROM python:3.11-slim
+FROM python:3.11-slim AS base-arm64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \

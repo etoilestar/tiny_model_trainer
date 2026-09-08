@@ -155,6 +155,46 @@ Metrics / Checkpoint / Model Artifact → MinIO
 - Docker Registry 镜像仓库
 - Nginx 网关
 
+### A800 x86 与昇腾 910B ARM64 部署
+
+训练后端支持 `auto`、`cpu`、`cuda[:N]` 和 `npu[:N]` 设备配置。A800 使用
+CUDA overlay 启动：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build -d
+```
+
+910B 必须先安装宿主机 Ascend Driver，并选择与宿主机 Driver/CANN 配套、包含
+ARM64 PyTorch、`torchvision` 和 `torch_npu` 的基础镜像。不要在 Ascend 镜像内
+用通用 PyPI `torch` wheel 覆盖厂商配套版本：
+
+```bash
+export PLATFORM=arm64
+export ASCEND_BASE_IMAGE=<匹配当前CANN的Ascend-PyTorch镜像>
+export ASCEND_RT_VISIBLE_DEVICES=0
+docker compose -f docker-compose.yml -f docker-compose.ascend.yml up --build -d
+```
+
+默认 Ascend overlay 映射 `/dev/davinci0`。多卡运行时需要在
+`docker-compose.ascend.yml` 中逐个增加 `/dev/davinciN`，同时将
+`ASCEND_RT_VISIBLE_DEVICES` 和画布中的 DDP 进程数设置为相同数量。启动训练前可
+在 worker 容器中检查运行时：
+
+```bash
+python - <<'PY'
+import torch
+import torch_npu
+
+assert torch.npu.is_available()
+x = torch.ones(2, device="npu:0")
+print(torch.__version__, x.device, x + x)
+PY
+```
+
+原生 ResNet、MobileNet、EfficientNet、UNet 和 BERT 训练器会根据设备自动选择
+CUDA/NCCL、Ascend/HCCL 或 CPU/Gloo。YOLO 是否能使用 `npu:N` 仍取决于基础镜像
+内安装的 Ultralytics 版本是否包含 Ascend 设备支持；CUDA A800 路径保持兼容。
+
 ---
 
 ## 推荐开发顺序

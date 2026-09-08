@@ -235,9 +235,15 @@ class YOLOTrainer(BaseTrainer):
         patience = int(config.get("patience", 50))
         workers = int(config.get("workers", 0))
 
-        device = config.get("device", "cpu")
+        device = str(config.get("device", "auto")).lower()
         if device == "cuda":
             device = 0
+        elif device == "npu":
+            device = "npu:0"
+        elif device == "auto":
+            from .device import resolve_accelerator
+            selected = resolve_accelerator("auto")
+            device = selected.index if selected.kind == "cuda" else str(selected.device)
 
         log_callback("INFO", f"加载 YOLO 模型: {model_path}")
         log_callback("INFO", f"使用 YOLO 数据配置: {dataset_path}")

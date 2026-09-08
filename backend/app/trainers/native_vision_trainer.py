@@ -96,6 +96,10 @@ class NativeVisionTrainer(BaseTrainer):
         if cuda_visible_devices not in (None, ""):
             env["CUDA_VISIBLE_DEVICES"] = str(cuda_visible_devices)
 
+        npu_visible_devices = config.get("npu_visible_devices")
+        if npu_visible_devices not in (None, ""):
+            env["ASCEND_RT_VISIBLE_DEVICES"] = str(npu_visible_devices)
+
         log_callback("INFO", f"启动原生 PyTorch [{trainer_type.upper()}] DDP 训练子进程")
         log_callback("INFO", f"运行目录: {run_dir}")
         log_callback("INFO", "启动命令: " + " ".join(cmd))
